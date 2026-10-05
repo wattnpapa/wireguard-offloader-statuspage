@@ -18,7 +18,7 @@ if [ ! -e /etc/offloader-status/config.toml ]; then
   echo "Beispielkonfiguration nach /etc/offloader-status/config.toml kopiert – anpassen und install.sh erneut ausführen."
   exit 0
 fi
-wert() { OFFLOADER_STATUS_LIB=/opt/offloader-status/lib python3 -c "from offloader_status import konfig; print(konfig.$1)"; }
+wert() { PYTHONPATH=/opt/offloader-status/lib python3 -c "from offloader_status import konfig; print(konfig.$1)"; }
 DATEN=$(wert DATEN); WEB=$(wert WEB)
 install -d -o offloader-status -g offloader-status -m 755 "$DATEN"
 install -d -o offloader-status -g offloader-status -m 755 "$WEB"
