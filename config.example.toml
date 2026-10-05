@@ -1,0 +1,80 @@
+# Beispielkonfiguration – nach /etc/offloader-status/config.toml kopieren und anpassen.
+# Nach jeder Änderung: offloader-status-einrichten --anwenden && systemctl restart offloader-status-live offloader-status-probe
+
+[seite]
+titel = "Offloader Traffic"
+web_verzeichnis = "/var/www/offloader-status"   # hier liegen index.html und die JSON-Dateien
+https_adresse = ""                              # z. B. "https://status.example.org" (nur für Hinweise)
+
+[hub]                                           # der Server, an dem alle Tunnel enden
+name = "Offloader"
+ort = "Rechenzentrum Frankfurt (Lage ungefähr)"
+lat = 50.11
+lng = 8.68
+internet = "eth0"
+internet_weitere = []                           # z. B. ["nat64"], wenn Verkehr auch darüber ins Internet geht
+tunnel = "wg0"
+oeffentlich = ["203.0.113.10", "2001:db8::10"]  # nur Anzeige
+tunnel_netz = "10.0.0.0/24"
+
+[daten]
+verzeichnis = "/var/lib/offloader-status"
+
+[nftables]
+tabelle = "accounting"
+datei = "/etc/offloader-status/accounting.nft"
+
+# Portwächter (optional): welche TCP-Ports von "host" sind von hier aus offen? Sinnvoll, wenn der Offloader
+# Verbindungen aus dem Internet an diesen Host weiterleitet – dann sieht der Test dasselbe wie das Internet.
+[portwaechter]
+host = ""                                       # z. B. "10.0.0.2"; leer = aus
+name = "Router Standort Nord"
+erwartet = [443]
+hinweis = "Portfreigaben am Router prüfen."
+
+# mobiler Standort, dessen Ort mastblick aus der Mobilfunkzelle bestimmt (https://github.com/wattnpapa/mastblick)
+[mastblick]
+standort = ""                                   # z. B. "mobil"
+
+# Dienste: Verkehr Internet ↔ Standorte nach Zielport (alles andere = "sonstige Ports")
+[[dienst]]
+port = 443
+name = "HTTPS (443)"
+farbe = "#3a7bd5"
+
+[[dienst]]
+port = 80
+name = "HTTP (80)"
+farbe = "#5bc0de"
+
+# Standorte: schluessel (a–z, 0–9) erscheint in Zählern und Dateien – später nicht mehr ändern
+[[standort]]
+schluessel = "nord"
+name = "Nord"
+tab = "Standort Nord"                           # Beschriftung des Reiters (Standard: name)
+peer = "10.0.0.2"                               # Tunnel-Adresse (AllowedIP /32 des Peers)
+netze = ["192.168.10.0/24"]                     # Netze hinter dem Standort
+ping_tcp = 443                                  # wenn der Router Ping verwirft: Latenz per TCP-Verbindungsaufbau
+lat = 53.55
+lng = 9.99
+farbe = "#7ac943"
+notiz = "Dienste aus dem Internet landen hier."
+
+[[standort]]
+schluessel = "sued"
+name = "Süd"
+tab = "Standort Süd"
+peer = "10.0.0.3"
+netze = ["192.168.20.0/24"]
+lat = 48.14
+lng = 11.58
+farbe = "#e0a030"
+
+# [[standort]]
+# schluessel = "mobil"
+# name = "Router mobil"
+# peer = "10.0.0.4"
+# netze = ["192.168.178.0/24"]
+# ping = "192.168.178.1"                        # Ping-Ziel (Standard: peer)
+# farbe = "#c04bd6"
+# (ohne lat/lng; mit [mastblick] standort = "mobil" kommt der Ort von mastblick)

@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+# Nach jeder Änderung an config.toml ausführen (als root):
+#   offloader-status-einrichten              nftables-Datei und config.json der Seite schreiben, Regeln prüfen
+#   offloader-status-einrichten --anwenden   zusätzlich die Zähler-Tabelle sofort laden (Zähler beginnen bei 0)
+#   offloader-status-einrichten --zeigen     nur die nftables-Regeln ausgeben
+# Dauerhaft wird die Tabelle erst, wenn /etc/nftables.conf die Datei einbindet (include "<datei>").
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.environ.get("OFFLOADER_STATUS_LIB") or _os.path.join(_os.path.dirname(_os.path.realpath(__file__)), "..", "lib"))
+import json, os, subprocess, sys
+from offloader_status import konfig
+
+
+def schreiben(pfad, inhalt, modus=0o644):
+    os.makedirs(os.path.dirname(pfad), exist_ok=True)
+    with open(pfad + ".tmp", "w") as f: f.write(inhalt)
+    os.chmod(pfad + ".tmp", modus)
+    os.replace(pfad + ".tmp", pfad)
+
+
+def main():
+    regeln = konfig.nft()
+    if "--zeigen" in sys.argv:
+        print(regeln, end=""); return
+    if not konfig.K["standort"]:
+        sys.exit(f"Keine Standorte in {konfig.PFAD} – erst [[standort]] eintragen (siehe config.example.toml).")
+    datei = konfig.K["nftables"]["datei"]
+    schreiben(datei, regeln)
+    schreiben(konfig.web("config.json"), json.dumps(konfig.seite(), ensure_ascii=False, indent=1) + "\n")
+    print(f"geschrieben: {datei}, {konfig.web('config.json')}")
+    r = subprocess.run(["nft", "-c", "-f", datei], capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(f"nftables lehnt die Regeln ab:\n{r.stderr}")
+    if "--anwenden" in sys.argv:
+        subprocess.run(["nft", "-f", datei], check=True)
+        print(f"Tabelle inet {konfig.K['nftables']['tabelle']} geladen.")
+    with open("/etc/nftables.conf") as f:
+        eingebunden = datei in f.read()
+    if not eingebunden:
+        print(f'Hinweis: /etc/nftables.conf bindet die Datei noch nicht ein – für einen dauerhaften Betrieb dort\n'
+              f'  include "{datei}"\nergänzen.')
+
+
+if __name__ == "__main__":
+    main()

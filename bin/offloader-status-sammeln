@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+# Alle 5 min (Timer): vnStat-Daten als data.json und die nftables-Zähler als 5-Minuten-Volumen (acct.json).
+# samples.csv: je Zeile Zeitstempel und Bytes je Zähler seit der letzten Zeile; Spaltenfolge in samples-spalten.json.
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.environ.get("OFFLOADER_STATUS_LIB") or _os.path.join(_os.path.dirname(_os.path.realpath(__file__)), "..", "lib"))
+import csv, json, os, subprocess, time
+from offloader_status import konfig
+
+K = konfig.K
+STATE = konfig.datei("last.json"); CSV = konfig.datei("samples.csv"); OUT = konfig.web("acct.json")
+
+
+def schreiben(pfad, inhalt):
+    with open(pfad + ".tmp", "w") as f: f.write(inhalt)
+    os.replace(pfad + ".tmp", pfad)
+
+
+def vnstat():
+    try:
+        schreiben(konfig.web("data.json"), subprocess.check_output(["vnstat", "--json"], text=True))
+    except (OSError, subprocess.CalledProcessError) as e:
+        print("vnstat:", e, flush=True)
+
+
+def main():
+    vnstat()
+    names = konfig.spalten(konfig.datei("samples-spalten.json"), konfig.zaehler())
+    j = json.loads(subprocess.check_output(["nft", "-j", "list", "counters", "table", "inet", K["nftables"]["tabelle"]]))
+    cur = {o["counter"]["name"]: o["counter"]["bytes"] for o in j["nftables"] if "counter" in o}
+    last = None
+    if os.path.exists(STATE):
+        with open(STATE) as f: last = json.load(f)
+    now = int(time.time()) // 300 * 300
+    if last:
+        # kleiner als zuvor = Zähler neu angelegt (Neustart, Tabelle ersetzt): dann zählt alles ab 0
+        delta = [cur.get(n, 0) - last.get(n, 0) if cur.get(n, 0) >= last.get(n, 0) else cur.get(n, 0) for n in names]
+        with open(CSV, "a") as f: csv.writer(f).writerow([now] + delta)
+    schreiben(STATE, json.dumps(cur))
+    cutoff = now - K["daten"]["aufbewahren_tage"] * 86400; rows = []
+    if os.path.exists(CSV):
+        with open(CSV) as f:
+            for r in csv.reader(f):
+                r = [int(x) for x in r]; r += [0] * (1 + len(names) - len(r))
+                if r[0] >= cutoff: rows.append(r)
+    schreiben(OUT, json.dumps({"names": names, "samples": rows}))
+
+
+if __name__ == "__main__":
+    main()

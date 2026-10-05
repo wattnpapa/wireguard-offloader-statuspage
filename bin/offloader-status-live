@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+# Schreibt alle 5 s live.json für die Seite:
+#  - je Standort: Handshake, Rate (rx = vom Standort, tx = zum Standort), Netze aus AllowedIPs
+#  - je Schnittstelle (Internet, Tunnel): Rate
+#  - flows: Rate je Richtung aus den nftables-Zählern f_<von>_<nach> (Bytes/s)
+#  - server: CPU, Last, RAM, Platte, Laufzeit, Verbindungen
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.environ.get("OFFLOADER_STATUS_LIB") or _os.path.join(_os.path.dirname(_os.path.realpath(__file__)), "..", "lib"))
+import json, os, subprocess, time
+from offloader_status import konfig
+
+K = konfig.K
+OUT = konfig.web("live.json"); STEP = 5
+PEERS = konfig.peers()
+IFS = (K["hub"]["internet"], K["hub"]["tunnel"])
+TABELLE = K["nftables"]["tabelle"]
+
+
+def cpu():
+    with open("/proc/stat") as f:
+        v = [int(x) for x in f.readline().split()[1:]]
+    return sum(v), v[3] + v[4]
+
+
+def lies(p):
+    with open(p) as f:
+        return f.read()
+
+
+def snap():
+    d = {}
+    for i in IFS:
+        try:
+            d[i] = {r: int(lies(f"/sys/class/net/{i}/statistics/{r}_bytes")) for r in ("rx", "tx")}
+        except OSError:
+            pass
+    for line in subprocess.check_output(["wg", "show", IFS[1], "dump"], text=True).splitlines()[1:]:
+        f = line.split("\t"); ips = f[3].split(",")
+        k = next((PEERS[a] for a in ips if a in PEERS), None)
+        if k: d[k] = {"hs": int(f[4]), "rx": int(f[5]), "tx": int(f[6]), "nets": ips}
+    j = json.loads(subprocess.check_output(["nft", "-j", "list", "counters", "table", "inet", TABELLE]))
+    fl = {o["counter"]["name"][2:]: o["counter"]["bytes"] for o in j["nftables"]
+          if "counter" in o and o["counter"]["name"].startswith("f_")}
+    return time.time(), d, fl, cpu()
+
+
+def server(c0, c1):
+    m = {l.split(":")[0]: int(l.split()[1]) for l in lies("/proc/meminfo").splitlines()}
+    s = os.statvfs("/")
+    tot = c1[0] - c0[0]
+    try: ct = int(lies("/proc/sys/net/netfilter/nf_conntrack_count"))
+    except OSError: ct = None
+    return {"cpu": round(100 * (1 - (c1[1] - c0[1]) / tot), 1) if tot else 0,
+            "load": [float(x) for x in lies("/proc/loadavg").split()[:3]],
+            "mem_total": m["MemTotal"] * 1024, "mem_used": (m["MemTotal"] - m["MemAvailable"]) * 1024,
+            "disk_total": s.f_blocks * s.f_frsize, "disk_used": (s.f_blocks - s.f_bfree) * s.f_frsize,
+            "uptime": float(lies("/proc/uptime").split()[0]), "conns": ct}
+
+
+def main():
+    t0, a, fa, c0 = snap()
+    while True:
+        time.sleep(STEP)
+        try: t1, b, fb, c1 = snap()
+        except Exception as e:
+            print("Abfrage:", e, flush=True); continue
+        dt = t1 - t0; out = {"ts": int(t1)}
+        for k, o in b.items():
+            p = a.get(k, o)
+            r = {"rx_rate": max(o["rx"] - p["rx"], 0) / dt, "tx_rate": max(o["tx"] - p["tx"], 0) / dt}
+            if "hs" in o: r["hs"] = o["hs"]; r["nets"] = o["nets"]
+            out[k] = r
+        out["flows"] = {k: max(v - fa.get(k, v), 0) / dt for k, v in fb.items()}
+        try: out["server"] = server(c0, c1)
+        except Exception: pass
+        with open(OUT + ".tmp", "w") as f: json.dump(out, f)
+        os.replace(OUT + ".tmp", OUT)
+        t0, a, fa, c0 = t1, b, fb, c1
+
+
+if __name__ == "__main__":
+    main()

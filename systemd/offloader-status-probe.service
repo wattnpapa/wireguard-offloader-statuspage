@@ -1,0 +1,21 @@
+[Unit]
+Description=Offloader-Statusseite: Erreichbarkeit und Latenz der Standorte (probe.json)
+After=network-online.target nftables.service
+Wants=network-online.target
+
+[Service]
+User=offloader-status
+Group=offloader-status
+ExecStart=/opt/offloader-status/bin/offloader-status-probe
+Restart=always
+RestartSec=10
+# wg show und nft list counters brauchen CAP_NET_ADMIN, ping CAP_NET_RAW
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

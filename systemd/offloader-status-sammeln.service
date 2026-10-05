@@ -1,0 +1,14 @@
+[Unit]
+Description=Offloader-Statusseite: vnStat-Daten und 5-Minuten-Volumen (data.json, acct.json)
+
+[Service]
+Type=oneshot
+User=offloader-status
+Group=offloader-status
+ExecStart=/opt/offloader-status/bin/offloader-status-sammeln
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes

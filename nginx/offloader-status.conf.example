@@ -1,0 +1,13 @@
+# Beispiel für nginx. Die Seite zeigt Netze, Adressen und Verkehr – nur im Tunnel/LAN oder hinter Anmeldung anbieten.
+server {
+    listen 10.0.0.1:8080;          # Tunnel-Adresse des Offloaders
+    listen 127.0.0.1:8080;
+    root /var/www/offloader-status;
+    index index.html;
+    access_log off;
+
+    # nur mit mastblick (mobiler Standort): API und Push-Kanal
+    location = /api/owntracks { proxy_pass http://127.0.0.1:8091; proxy_set_header Authorization $http_authorization; client_max_body_size 64k; }
+    location = /api/mast/stream { proxy_pass http://127.0.0.1:8091; proxy_buffering off; proxy_cache off; proxy_read_timeout 1h; }
+    location /api/mast { proxy_pass http://127.0.0.1:8091; proxy_set_header Host $host; client_max_body_size 64k; }
+}

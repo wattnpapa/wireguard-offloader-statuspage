@@ -1,0 +1,902 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Offloader Traffic</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:system-ui,sans-serif;background:#111;color:#ddd;margin:0;padding:1.5rem}
+h1{font-weight:400;margin:0 0 1rem;font-size:1.4rem}h1 small{color:#888;font-size:.8rem;margin-left:1rem}
+.tabs button{background:#222;color:#ccc;border:1px solid #333;padding:.4rem 1rem;border-radius:6px;cursor:pointer;margin-right:.5rem}
+.tabs button .live{display:block;font-size:.7rem;color:#999;margin-top:.15rem;font-variant-numeric:tabular-nums}
+.tabs button.active .live{color:#dde8f8}
+.dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:#555;margin-right:.4rem;vertical-align:middle}
+.dot.on{background:#7ac943}.dot.off{background:#d9534f}
+.tabs button.active{background:#3a7bd5;color:#fff;border-color:#3a7bd5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:1.5rem;margin-top:1.5rem}
+.card.site{display:none}body.site .card{display:none}body.site .card.site{display:block}
+.card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:1rem}
+.card h2{font-weight:400;font-size:1rem;margin:0 0 .5rem;color:#aaa}
+.card .tot{font-size:.85rem;color:#888;margin-bottom:.5rem}
+canvas{max-height:260px}
+.card.flow{margin-top:1.5rem;display:block!important}
+#flow{width:100%;max-width:1120px;display:block;margin:0 auto}
+#alarm{display:none;margin-top:1rem;background:#4a1515;border:1px solid #d9534f;color:#ffd7d5;border-radius:8px;padding:.7rem 1rem;font-size:.9rem}
+.vsw{float:right}.vsw button{background:#222;color:#aaa;border:1px solid #333;padding:.2rem .7rem;font-size:.8rem;cursor:pointer}
+.vsw button:first-child{border-radius:6px 0 0 6px}.vsw button:last-child{border-radius:0 6px 6px 0;border-left:0}.vsw button.on{background:#3a7bd5;color:#fff;border-color:#3a7bd5}
+#map{display:none;height:560px;border-radius:6px;background:#111;margin-bottom:.5rem}
+#map .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.8) contrast(.9) saturate(.6)}
+.mnode{background:none;border:0}.mnode .mb,.mmob .mb{width:76px;height:76px;white-space:nowrap;border-radius:50%;border:3px solid #999;background:#161616ee;color:#ddd;display:flex;flex-direction:column;justify-content:center;align-items:center;font:600 11px system-ui;box-sizing:border-box}
+.mnode .ml{position:absolute;left:82px;top:4px;white-space:nowrap;color:#bbb;font:12px system-ui;text-shadow:0 0 3px #000,0 0 6px #000}
+.mnode .ml b{color:#eee;font-weight:500;font-size:13px}.mnode .mi,.mmob .mi{font:11px ui-monospace,monospace;color:#999;line-height:1.45}
+.mmob{display:flex;gap:.6rem;align-items:center;background:#1a1a1aee;border:1px solid #333;border-radius:8px;padding:.5rem .7rem;color:#bbb;font:12px system-ui}
+.mmob.geo{cursor:pointer}.mmob .old{color:#e0a040}
+.mfritz{background:#c04bd6;border:2px solid #fff;border-radius:50%;box-shadow:0 0 6px #c04bd6}
+.mmob .mb{width:64px;height:64px;font-size:10px}.mmob b{color:#eee;font-weight:500}
+.mnode .mb{width:16px;height:16px;border-width:3px;background:#161616;cursor:pointer}
+.mnode .ml{left:15px;top:-3px}.mnode .ml b{font-size:12px}
+.mnode .md{display:none;margin-top:.25rem;background:#161616f2;border:1px solid #333;border-radius:6px;padding:.35rem .55rem;text-shadow:none}
+.mnode:hover .md,.mnode.open .md{display:block}.mnode:hover,.mnode.open{z-index:10000!important}
+.fp{background:#1a1a1af2;border:1px solid #333;border-radius:8px;padding:.5rem .65rem;color:#bbb;font:12px system-ui;width:250px;max-height:480px;overflow:auto}
+.fp b{color:#eee;font-weight:500}.fp .sub{color:#888;font-size:11px}.fp hr{border:0;border-top:1px solid #333;margin:.45rem 0}
+.fp button{background:#222;color:#ccc;border:1px solid #444;border-radius:5px;padding:.15rem .5rem;font-size:11px;cursor:pointer;margin:.1rem .15rem .1rem 0}
+.fp button.on{background:#c04bd6;border-color:#c04bd6;color:#fff}.fp button.pri{border-color:#c04bd6;color:#e9b6f3}
+.fp input{background:#111;color:#ddd;border:1px solid #444;border-radius:5px;padding:.15rem .4rem;font-size:11px;width:135px}
+.fp a{color:#9ec5ff}.fp a.btn{display:inline-block;background:#222;border:1px solid #c04bd6;color:#e9b6f3;border-radius:5px;padding:.15rem .5rem;font-size:11px;text-decoration:none;margin:.15rem 0}.fp .msg{color:#e0a040;margin-top:.2rem}.fp .okm{color:#7ac943}.fp .om{border-top:1px dotted #333;padding:.3rem 0}.fp table.gt{border-collapse:collapse;font-size:10.5px;margin:.2rem 0;width:100%}.fp table.gt td,.fp table.gt th{padding:1px 3px;text-align:right;border-bottom:1px solid #2a2a2a}.fp table.gt th{color:#999;font-weight:normal}.fp table.gt td:first-child,.fp table.gt th:first-child{text-align:left}
+.mmast{background:none;border:0}.mmast svg{display:block;filter:drop-shadow(0 0 2px #000)}.mmast.vor{opacity:.75;cursor:pointer}
+#map.full{position:fixed!important;inset:0;width:100vw;height:100vh;height:100dvh!important;z-index:5000;border-radius:0;margin:0}
+.fp .fphead{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:.5rem}.fp.zu .fpbody{display:none}.fp.zu{width:auto}
+.fp .fphead small{color:#888;font-weight:400}
+.mctl a{display:block;width:30px;height:30px;line-height:30px;text-align:center;background:#fff;color:#222;font:16px system-ui;text-decoration:none;cursor:pointer}
+.mctl a.on{background:#2f8cff;color:#fff}
+.mme{background:#2f8cff;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 4px #2f8cff55}
+@media(max-width:700px){.fp{width:205px;max-height:55vh;max-height:55dvh}}
+.vpop{font:12px system-ui;color:#222}.vpop button{margin:.3rem .3rem 0 0;padding:.15rem .5rem;font-size:11px;cursor:pointer}
+.mnode .rt{font:600 12px system-ui;color:#ddd;margin-bottom:.15rem}.mnode .rt small{color:#999;font-weight:400}.mnode .old{color:#e0a040}
+.mflow{animation:mflow linear infinite}.lnkm{animation-duration:1.1s}@keyframes mflow{to{stroke-dashoffset:-18.1}}
+.leaflet-container{font:12px system-ui}.leaflet-control-attribution{background:#000a!important;color:#888}.leaflet-control-attribution a{color:#9bd}
+#flowlist{display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;justify-content:center;font-size:.85rem;color:#bbb;margin:.3rem 0 .6rem}
+#flowlist i{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;margin-right:.35rem}
+#flowlist b{color:#eee;font-weight:500}
+.legend{font-size:.75rem;color:#777;text-align:center}
+#srv{text-align:center;margin:.6rem 0 0}
+#siteinfo{display:none;margin-top:1rem;font-size:.9rem;color:#aaa;line-height:1.6}body.site #siteinfo{display:block}
+#siteinfo code{background:#222;border:1px solid #333;border-radius:4px;padding:.05rem .4rem;color:#eee;font-size:.85rem}
+#siteinfo span{color:#777;font-size:.8rem}
+#outl{font-size:.82rem;color:#aaa;margin:.6rem 0 0;padding-left:1.1rem}#outl b{color:#ccc;font-weight:500;margin-left:-1.1rem;display:block}
+@media(max-width:560px){body{padding:1rem}.grid{grid-template-columns:1fr}.tabs button{margin-bottom:.4rem}}
+</style></head><body>
+<h1><span id="titel">Offloader Traffic</span> <small id="stand"></small></h1>
+<div class="tabs"></div>
+<div id="alarm"></div>
+<div class="card flow"><h2>Verkehr jetzt <span class="vsw"><button data-v="schema" class="on">Schema</button><button data-v="karte">Karte</button></span></h2><div id="map"></div><svg id="flow" viewBox="0 0 1120 490" role="img" aria-label="Verkehrsfluss zwischen Internet, Offloader und Standorten"></svg>
+ <div id="flowlist"></div><div class="legend">alle 5 s · ↓ empfängt · ↑ sendet · Linienstärke = Rate · gestrichelt = nicht verbunden</div><div class="tot" id="srv"></div></div>
+<div id="siteinfo"></div>
+<div class="grid">
+ <div class="card"><h2>Durchsatz, 5-Minuten-Mittel (letzte 48 h)</h2><div class="tot" id="t5"></div><canvas id="c5"></canvas></div>
+ <div class="card"><h2>Volumen pro Stunde (letzte 4 Tage)</h2><div class="tot" id="th"></div><canvas id="ch"></canvas></div>
+ <div class="card"><h2>Volumen pro Tag</h2><div class="tot" id="td"></div><canvas id="cd"></canvas></div>
+ <div class="card"><h2>Volumen pro Monat</h2><div class="tot" id="tm"></div><canvas id="cm"></canvas></div>
+
+ <div class="card"><h2>Dienste – Durchsatz, 5-Minuten-Mittel (letzte 48 h)</h2><div class="tot" id="tv5"></div><canvas id="cv5"></canvas></div>
+ <div class="card"><h2>Dienste – Volumen pro Tag (rx+tx)</h2><div class="tot" id="tvd"></div><canvas id="cvd"></canvas></div>
+
+ <div class="card"><h2>IPv4 / IPv6 – Durchsatz, 5-Minuten-Mittel (letzte 48 h)</h2><div class="tot" id="ta5"></div><canvas id="ca5"></canvas></div>
+ <div class="card"><h2>IPv4 / IPv6 – Volumen pro Tag (rx+tx)</h2><div class="tot" id="tad"></div><canvas id="cad"></canvas></div>
+ <div class="card"><h2>IPv4 / IPv6 – Volumen pro Monat (rx+tx)</h2><div class="tot" id="tam"></div><canvas id="cam"></canvas></div>
+
+ <div class="card site"><h2>Standort – Durchsatz, 5-Minuten-Mittel (letzte 48 h)</h2><div class="tot" id="ts5"></div><canvas id="cs5"></canvas></div>
+ <div class="card site"><h2>Standort – Volumen pro Stunde (letzte 4 Tage)</h2><div class="tot" id="tsh"></div><canvas id="csh"></canvas></div>
+ <div class="card site"><h2>Standort – Volumen pro Tag</h2><div class="tot" id="tsd"></div><canvas id="csd"></canvas></div>
+ <div class="card site"><h2>Standort – Volumen pro Monat</h2><div class="tot" id="tsm"></div><canvas id="csm"> </canvas></div>
+ <div class="card site"><h2>Herkunft und Ziel – Volumen pro Stunde (letzte 4 Tage)</h2><div class="tot" id="tsf"></div><canvas id="csf"></canvas></div>
+ <div class="card site"><h2>Verfügbarkeit pro Tag (letzte 30 Tage)</h2><div class="tot" id="tup"></div><canvas id="cup"></canvas><ul id="outl"></ul></div>
+ <div class="card site"><h2>Latenz und Paketverlust (letzte 48 h)</h2><div class="tot" id="tlat"></div><canvas id="clat"></canvas></div>
+</div>
+<script src="chart.umd.js"></script>
+<script>window.Chart||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"><\/script>')</script>
+<script>
+const RX="#7ac943",TX="#3a7bd5";
+Chart.defaults.color="#999";Chart.defaults.borderColor="#2a2a2a";
+const fmt=b=>{const u=["B","KiB","MiB","GiB","TiB"];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++}return b.toFixed(i?2:0)+" "+u[i]};
+const pad=n=>String(n).padStart(2,"0");
+const lbl5=e=>`${pad(e.date.day)}.${pad(e.date.month)}. ${pad(e.time.hour)}:${pad(e.time.minute)}`;
+const lblH=e=>`${pad(e.date.day)}.${pad(e.date.month)}. ${pad(e.time.hour)}h`;
+const lblD=e=>`${pad(e.date.day)}.${pad(e.date.month)}.`;
+const lblM=e=>`${pad(e.date.month)}/${e.date.year}`;
+let charts={},data;
+function mk(id,type,labels,rx,tx,unit){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{type,
+   data:{labels,datasets:[
+    {label:"Empfangen (rx)",data:rx,borderColor:RX,backgroundColor:type==="line"?RX+"33":RX,fill:type==="line",tension:.3,pointRadius:0,borderWidth:1.5},
+    {label:"Gesendet (tx)",data:tx,borderColor:TX,backgroundColor:type==="line"?TX+"33":TX,fill:type==="line",tension:.3,pointRadius:0,borderWidth:1.5}]},
+   options:{responsive:true,interaction:{mode:"index",intersect:false},
+    scales:{x:{ticks:{maxTicksLimit:12,maxRotation:0},stacked:type==="bar"},y:{beginAtZero:true,stacked:type==="bar",title:{display:true,text:unit}}},
+    plugins:{legend:{labels:{boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+c.parsed.y.toFixed(2)+" "+unit}}}}});
+}
+function sum(a,k){return a.reduce((s,e)=>s+e[k],0)}
+function renderSite(key){
+  const names=NAME[key];
+  // samples[i][0] ist der Zeitstempel, Zählerspalten beginnen bei 1
+  const r=acct.names.indexOf(key+"_rx")+1, t=acct.names.indexOf(key+"_tx")+1;
+  const S=acct.samples, MB=1048576, now=Date.now()/1000;
+  const tl=e=>{const d=new Date(e[0]*1000);return `${pad(d.getDate())}.${pad(d.getMonth()+1)}. ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+  const f=S.filter(x=>x[0]>now-48*3600);
+  mkN("cs5","line",f.map(tl),[{l:"vom Standort (rx)",d:f.map(x=>x[r]*8/300/1e6),c:RX},{l:"zum Standort (tx)",d:f.map(x=>x[t]*8/300/1e6),c:TX}],"Mbit/s");
+  const agg=(arr,keyf)=>{const m=new Map();for(const x of arr){const k=keyf(new Date(x[0]*1000));const o=m.get(k)||{rx:0,tx:0};o.rx+=x[r];o.tx+=x[t];m.set(k,o)}return m};
+  const H=agg(S.filter(x=>x[0]>now-96*3600),d=>`${pad(d.getDate())}.${pad(d.getMonth()+1)}. ${pad(d.getHours())}h`);
+  const D=agg(S,d=>`${pad(d.getDate())}.${pad(d.getMonth()+1)}.`), M=agg(S,d=>`${pad(d.getMonth()+1)}/${d.getFullYear()}`);
+  const bars=(id,m,div,unit)=>mkN(id,"bar",[...m.keys()],[{l:"vom Standort (rx)",d:[...m.values()].map(o=>o.rx/div),c:RX},{l:"zum Standort (tx)",d:[...m.values()].map(o=>o.tx/div),c:TX}],unit);
+  bars("csh",H,MB,"MiB");bars("csd",D,MB,"MiB");bars("csm",M,MB*1024,"GiB");
+  const tot=arr=>{let a=0,b=0;for(const x of arr){a+=x[r];b+=x[t]}return `rx ${fmt(a)} · tx ${fmt(b)}`};
+  document.getElementById("ts5").textContent=f.length?tot(f)+" in 48 h":"noch keine Daten";
+  document.getElementById("tsh").textContent=tot(S.filter(x=>x[0]>now-96*3600))+" in 4 Tagen";
+  document.getElementById("tsd").textContent=tot(S)+" seit Beginn der Zählung";
+  document.getElementById("tsm").textContent=`Standort ${names}: rx = aus dem Standortnetz kommend, tx = in den Standort hinein (Offloader-Traffic und Standort-zu-Standort)`;
+  renderSiteExtra(key);
+  document.getElementById("stand").textContent=`Standort ${names} · Stand ${new Date(S.length?S[S.length-1][0]*1000:Date.now()).toLocaleString("de-DE")}`;
+}
+function render(ifn){
+  document.body.classList.toggle("site",ifn.startsWith("site:"));
+  if(ifn.startsWith("site:")){renderSite(ifn.slice(5));return}
+  const it=data.interfaces.find(i=>i.name===ifn); if(!it)return;
+  const t=it.traffic, MB=1048576;
+  const f=t.fiveminute.slice(-576), h=t.hour.slice(-96), d=t.day, m=t.month;
+  mk("c5","line",f.map(lbl5),f.map(e=>e.rx*8/300/1e6),f.map(e=>e.tx*8/300/1e6),"Mbit/s");
+  mk("ch","bar",h.map(lblH),h.map(e=>e.rx/MB),h.map(e=>e.tx/MB),"MiB");
+  mk("cd","bar",d.map(lblD),d.map(e=>e.rx/MB),d.map(e=>e.tx/MB),"MiB");
+  mk("cm","bar",m.map(lblM),m.map(e=>e.rx/MB/1024),m.map(e=>e.tx/MB/1024),"GiB");
+  const tt=(id,a)=>document.getElementById(id).textContent=a.length?`rx ${fmt(sum(a,"rx"))} · tx ${fmt(sum(a,"tx"))} im Zeitraum`:"noch keine Daten";
+  tt("t5",f);tt("th",h);tt("td",d);tt("tm",m);
+  renderAcct(ifn);renderSvc();projection(m);
+  document.getElementById("stand").textContent=`gesamt seit ${it.created.date.day}.${it.created.date.month}.${it.created.date.year}: rx ${fmt(t.total.rx)} · tx ${fmt(t.total.tx)} · Stand ${pad(it.updated.date.day)}.${pad(it.updated.date.month)}. ${pad(it.updated.time.hour)}:${pad(it.updated.time.minute)}`;
+}
+// Reiter aus config.json: Internet-Schnittstelle (vnStat), dann je Standort
+function tabsBauen(){
+  const T=document.querySelector(".tabs");
+  T.innerHTML=`<button data-if="${esc(CFG.internet)}" class="active">${esc(CFG.internet)} – Internet<span class="live"></span></button>`+
+    CFG.standorte.map(s=>`<button data-if="site:${s.schluessel}"><span class="dot"></span>${esc(s.tab)}<span class="live"></span></button>`).join("");
+  T.querySelectorAll("button").forEach(b=>b.onclick=()=>{T.querySelectorAll("button").forEach(x=>x.classList.remove("active"));b.classList.add("active");render(b.dataset.if)});
+}
+// Seite aus config.json aufbauen (erzeugt von offloader-status-einrichten aus config.toml)
+function aufbauen(){
+  document.title=CFG.titel; document.getElementById("titel").textContent=CFG.titel;
+  MOB=CFG.mastblick; SITES=CFG.standorte.map(s=>s.schluessel); PEER=["inet",...SITES];
+  for(const s of CFG.standorte){SITE[s.schluessel]=s;NAME[s.schluessel]=s.name;if(s.lat!=null&&!s.mobil)GEO[s.schluessel]=[s.lat,s.lng]}
+  if(CFG.hub.lat!=null)GEO.hub=[CFG.hub.lat,CFG.hub.lng];
+  // Schema: Standorte im Bogen rechts vom Offloader, außer "schema = [x, y, r]" ist gesetzt
+  const n=SITES.length, rr=n>6?34:n>4?40:44;
+  CFG.standorte.forEach((s,i)=>{const w=n>1?(-66+132*i/(n-1))*Math.PI/180:0, p=s.schema||[];
+    NODES[s.schluessel]={x:p[0]??470+330*Math.cos(w),y:p[1]??230+190*Math.sin(w),r:p[2]||rr,c:s.farbe}});
+  SVC=[...CFG.dienste,["other","sonstige Ports","#888"]];
+  if(!CFG.dienste.length)for(const id of ["cv5","cvd"])document.getElementById(id).closest(".card").style.display="none";
+  tabsBauen();
+}
+async function load(){data=await (await fetch("data.json?t="+Date.now())).json();acct=await (await fetch("acct.json?t="+Date.now())).json();try{PROBE=await (await fetch("probe.json?t="+Date.now())).json()}catch(e){};render(document.querySelector(".tabs .active").dataset.if)}
+setInterval(()=>{if(!sseFresh())load()},300000);
+setInterval(async()=>{if(sseFresh())return;try{PROBE=await (await fetch("probe.json?t="+Date.now())).json()}catch(e){}},60000);
+// Push vom Server (SSE über mastblick, /api/mast/stream): solange Ereignisse kommen, fragt die Seite nicht selbst ab.
+// Ohne mastblick holt die Seite live.json, probe.json und acct.json selbst.
+let SSE_T=0; const sseFresh=()=>Date.now()-SSE_T<25000;
+function sseStart(){
+  if(!window.EventSource||!MOB)return; const es=new EventSource("api/mast/stream");
+  const on=(n,f)=>es.addEventListener(n,e=>{SSE_T=Date.now();try{f(JSON.parse(e.data))}catch(x){console.warn("SSE",n,x)}});
+  on("ping",()=>{}); on("live",d=>live(d)); on("probe",d=>{PROBE=d}); on("fritzgeo",d=>loadFritzGeo(d)); on("acct",()=>load());
+  on("tracking",d=>{if(MAP){MAP.otState=d;renderFP()}}); on("masten",()=>{if(MAP){loadMasten();loadMast()}}); on("gps",d=>gpsLive(d));
+  es.onerror=()=>{SSE_T=0};
+}
+// Live-Status aus live.json (alle 5 s vom Dienst offloader-status-live geschrieben)
+const mbit=b=>{const v=b*8/1e6;return (v<10?v.toFixed(2):v.toFixed(1))+" Mbit/s"};
+const ago=s=>s<90?`${s} s`:s<5400?`${Math.round(s/60)} min`:s<172800?`${Math.round(s/3600)} h`:`${Math.round(s/86400)} d`;
+async function live(D){
+  if(!CFG)return; let L=D; if(!L){if(sseFresh())return; try{L=await (await fetch("live.json?t="+Date.now())).json()}catch(e){return}}
+  const stale=Date.now()/1000-L.ts>30;
+  LIVE=L;drawFlow(L,stale);
+  const act=document.querySelector(".tabs .active").dataset.if;if(act.startsWith("site:"))siteInfo(act.slice(5));
+  for(const b of document.querySelectorAll(".tabs button")){
+    const k=b.dataset.if.replace("site:",""), o=L[k], el=b.querySelector(".live"), dot=b.querySelector(".dot");
+    if(!o||stale){el.textContent=stale?"Live-Daten veraltet":"";continue}
+    const rate=`rx ${mbit(o.rx_rate)} · tx ${mbit(o.tx_rate)}`;
+    if(!("hs" in o)){el.textContent=rate;continue}
+    const age=o.hs?Math.round(L.ts-o.hs):null, on=age!==null&&age<180;
+    dot.className="dot "+(on?"on":"off");
+    b.title=o.hs?`letzter Handshake vor ${ago(age)}`:"noch nie verbunden";
+    el.textContent=on?rate:(o.hs?`getrennt seit ${ago(age)}`:"nie verbunden");
+  }
+}
+setInterval(live,5000);
+
+const V4="#e0a030",V6="#c04bd6",V4T="#f0c878",V6T="#e09af0";
+let acct;
+function mkN(id,type,labels,sets,unit){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{type,
+   data:{labels,datasets:sets.map(x=>({label:x.l,data:x.d,borderColor:x.c,backgroundColor:type==="line"?x.c+"22":x.c,fill:type==="line",tension:.3,pointRadius:0,borderWidth:1.5}))},
+   options:{responsive:true,interaction:{mode:"index",intersect:false},
+    scales:{x:{ticks:{maxTicksLimit:12,maxRotation:0},stacked:type==="bar"},y:{beginAtZero:true,stacked:type==="bar",title:{display:true,text:unit}}},
+    plugins:{legend:{labels:{boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+": "+c.parsed.y.toFixed(2)+" "+unit}}}}});
+}
+function renderAcct(ifn){
+  if(!acct)return;
+  const ix=k=>acct.names.indexOf(ifn+"_"+k)+1, r4=ix("rx4"),t4=ix("tx4"),r6=ix("rx6"),t6=ix("tx6");
+  const S=acct.samples, MB=1048576, now=Date.now()/1000;
+  const f=S.filter(s=>s[0]>now-48*3600);
+  const rate=(s,i)=>s[i]*8/300/1e6, tl=e=>{const d=new Date(e[0]*1000);return `${pad(d.getDate())}.${pad(d.getMonth()+1)}. ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+  mkN("ca5","line",f.map(tl),[
+    {l:"IPv4 rx",d:f.map(s=>rate(s,r4)),c:V4},{l:"IPv4 tx",d:f.map(s=>rate(s,t4)),c:V4T},
+    {l:"IPv6 rx",d:f.map(s=>rate(s,r6)),c:V6},{l:"IPv6 tx",d:f.map(s=>rate(s,t6)),c:V6T}],"Mbit/s");
+  const agg=(keyf)=>{const m=new Map();for(const s of S){const k=keyf(new Date(s[0]*1000));const o=m.get(k)||{v4:0,v6:0};o.v4+=s[r4]+s[t4];o.v6+=s[r6]+s[t6];m.set(k,o)}return m};
+  const D=agg(d=>`${pad(d.getDate())}.${pad(d.getMonth()+1)}.`), M=agg(d=>`${pad(d.getMonth()+1)}/${d.getFullYear()}`);
+  mkN("cad","bar",[...D.keys()],[{l:"IPv4",d:[...D.values()].map(o=>o.v4/MB),c:V4},{l:"IPv6",d:[...D.values()].map(o=>o.v6/MB),c:V6}],"MiB");
+  mkN("cam","bar",[...M.keys()],[{l:"IPv4",d:[...M.values()].map(o=>o.v4/MB/1024),c:V4},{l:"IPv6",d:[...M.values()].map(o=>o.v6/MB/1024),c:V6}],"GiB");
+  const tot=(arr)=>{let v4=0,v6=0;for(const s of arr){v4+=s[r4]+s[t4];v6+=s[r6]+s[t6]}const t=v4+v6||1;return `IPv4 ${fmt(v4)} (${(100*v4/t).toFixed(1)} %) · IPv6 ${fmt(v6)} (${(100*v6/t).toFixed(1)} %)`};
+  document.getElementById("ta5").textContent=f.length?tot(f):"noch keine Daten";
+  document.getElementById("tad").textContent=S.length?tot(S)+" seit Beginn der Zählung":"noch keine Daten";
+  document.getElementById("tam").textContent=S.length?`${S.length} Messpunkte à 5 min`:"noch keine Daten";
+}
+// ---- Gemeinsame Helfer ----
+const tsl=ts=>{const d=new Date(ts*1000);return `${pad(d.getDate())}.${pad(d.getMonth()+1)}. ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const dayl=ts=>{const d=new Date(ts*1000);return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.`};
+const hourl=ts=>{const d=new Date(ts*1000);return `${pad(d.getDate())}.${pad(d.getMonth()+1)}. ${pad(d.getHours())}h`};
+const de=(v,n)=>v.toFixed(n).replace(".",",");
+const num=b=>{const v=b*8/1e6;return v<0.005?"0":v<10?de(v,2):de(v,1)};
+let CFG=null, MOB=null, NAME={inet:"Internet"}, SITE={}, SITES=[], PEER=["inet"];
+// Tunnel-Adresse oder Netz dahinter? Mit tunnel_netz per Präfix, sonst gilt jede /32 als Tunnel-Adresse
+function isTun(n){const c=CFG.hub.tunnel_netz;if(!c)return n.endsWith("/32");
+  const ip=s=>s.split("/")[0].split(".").reduce((x,y)=>x*256+ +y,0), b=+c.split("/")[1], m=b?(0xffffffff<<(32-b))>>>0:0;
+  return ((ip(n)&m)>>>0)===((ip(c)&m)>>>0)}
+let PROBE=null, LIVE=null;
+function mkC(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg)}
+// erster Messpunkt mit den Fluss- und Dienstzählern (ältere Zeilen sind mit 0 aufgefüllt)
+function flowStart(){const ix=acct.names.map((n,i)=>/^[fs]_/.test(n)?i+1:0).filter(Boolean);const s=acct.samples.find(r=>ix.some(i=>r[i]>0));return s?s[0]:Infinity}
+
+// ---- Verkehrsfluss (Diagramm oben) ----
+// Internet links, Offloader Mitte, Standorte im Bogen rechts; Beschriftung der Standorte rechts neben dem Kreis
+const NODES={inet:{x:150,y:230,r:46,c:"#3a7bd5"},hub:{x:470,y:230,r:50,c:"#999"}};   // Standorte ergänzt aufbauen()
+const SVGNS="http://www.w3.org/2000/svg";
+const sv=(tag,attrs,parent)=>{const e=document.createElementNS(SVGNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);parent&&parent.appendChild(e);return e};
+let FL=null,lastT=0;
+function initFlow(){
+  const svg=document.getElementById("flow"); FL={lanes:[],nodes:{}};
+  const gl=sv("g",{},svg), gd=sv("g",{},svg), gn=sv("g",{},svg), H=NODES.hub;
+  for(const k of PEER){
+    const P=NODES[k], dx=H.x-P.x, dy=H.y-P.y, L=Math.hypot(dx,dy), ux=dx/L, uy=dy/L, nx=-uy, ny=ux;
+    for(const dir of ["in","out"]){ // in: Knoten -> Offloader, out: Offloader -> Knoten, zwei parallele Spuren
+      const o=dir==="in"?6:-6;
+      let a={x:P.x+ux*P.r+nx*o,y:P.y+uy*P.r+ny*o}, b={x:H.x-ux*H.r+nx*o,y:H.y-uy*H.r+ny*o};
+      if(dir==="out")[a,b]=[b,a];
+      FL.lanes.push({k,dir,a,b,len:Math.hypot(b.x-a.x,b.y-a.y),line:sv("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,"stroke-linecap":"round"},gl),
+                     g:sv("g",{},gd),dots:[],phase:0,rate:0,w:1,on:false,color:"#555"});
+    }
+  }
+  for(const k of ["hub",...PEER]){
+    const N=NODES[k], g=sv("g",{},gn);
+    const c=sv("circle",{cx:N.x,cy:N.y,r:N.r,fill:"#161616","stroke-width":3,stroke:N.c},g);
+    const t1=sv("text",{x:N.x,y:N.y-3,"text-anchor":"middle","font-size":14,fill:"#ddd"},g);
+    const t2=sv("text",{x:N.x,y:N.y+16,"text-anchor":"middle","font-size":14,fill:"#ddd"},g);
+    const info=[];
+    if(k!=="hub"){
+      // Name, darunter Tunnel-Adresse und Netze: Internet unter dem Kreis, Standorte rechts daneben
+      const side=k!=="inet", x0=side?N.x+N.r+14:N.x, y0=side?N.y-12:N.y+N.r+22, anchor=side?"start":"middle";
+      const lab=sv("text",{x:x0,y:y0,"text-anchor":anchor,"font-size":14,fill:"#bbb"},g);lab.textContent=NAME[k];
+      for(let i=1;i<=4;i++)info.push(sv("text",{x:x0,y:y0+i*16,"text-anchor":anchor,"font-size":12,fill:"#777","font-family":"ui-monospace,monospace"},g));
+    }
+    FL.nodes[k]={c,t1,t2,info};
+  }
+  FL.nodes.hub.t1.textContent=CFG.hub.name;
+  (CFG.hub.oeffentlich||[]).slice(0,2).forEach((a,i)=>FL.nodes.inet.info[i].textContent=a);
+  requestAnimationFrame(tick);
+}
+function tick(t){
+  const dt=lastT?Math.min(.1,(t-lastT)/1000):0; lastT=t;
+  for(const l of FL.lanes){
+    const mb=l.rate*8/1e6;
+    if(!l.on||mb<0.02){l.g.style.display="none";continue}
+    l.g.style.display="";
+    const sp=25+35*Math.log10(1+mb), gap=34, n=Math.ceil(l.len/gap)+1, r=Math.min(6,2+l.w/2);
+    while(l.dots.length<n)l.dots.push(sv("circle",{r:0},l.g));
+    l.phase=(l.phase+sp*dt)%gap;
+    l.dots.forEach((d,i)=>{const s=l.phase+i*gap;if(s>l.len){d.setAttribute("r",0);return}
+      const f=s/l.len;d.setAttribute("cx",l.a.x+(l.b.x-l.a.x)*f);d.setAttribute("cy",l.a.y+(l.b.y-l.a.y)*f);d.setAttribute("r",r);d.setAttribute("fill",l.color)});
+  }
+  requestAnimationFrame(tick);
+}
+// Rate mit Einheit im Kreis: unter 1 Mbit/s in kbit/s, Einheit kleiner gesetzt
+function setRate(t,arrow,b){
+  const v=b*8/1e6, [val,unit]=v<1?[(v*1000).toFixed(0),"kbit/s"]:[v<10?de(v,2):de(v,1),"Mbit/s"];
+  t.textContent=`${arrow} ${val}`;
+  sv("tspan",{"font-size":10,fill:"#999",dx:3},t).textContent=unit;
+}
+function drawFlow(L,stale){
+  if(!FL)initFlow();
+  const F=L.flows||{}, g=k=>F[k]||0, on={inet:!stale};
+  for(const k of SITES){const o=L[k];on[k]=!stale&&!!(o&&o.hs&&L.ts-o.hs<180)}
+  const rate={inet:{in:SITES.reduce((s,k)=>s+g("inet_"+k),0),out:SITES.reduce((s,k)=>s+g(k+"_inet"),0)}};
+  for(const k of SITES){const o=L[k]||{};rate[k]={in:o.rx_rate||0,out:o.tx_rate||0}}
+  // Farbe einer Spur zum Knoten = Farbe der Quelle, die gerade am meisten dorthin schickt
+  const src=k=>{let b=null,bv=0;for(const s of PEER)if(s!==k&&g(`${s}_${k}`)>bv){bv=g(`${s}_${k}`);b=s}return b};
+  for(const l of FL.lanes){
+    l.on=on[l.k]; l.rate=rate[l.k][l.dir];
+    const s=l.dir==="in"?l.k:src(l.k); l.color=s?NODES[s].c:"#888";
+    const mb=l.rate*8/1e6; l.w=mb<0.01?1.2:Math.min(11,1.5+2.6*Math.log10(1+mb));
+    const a={stroke:l.on?l.color:"#555","stroke-opacity":l.on?.45:.9,"stroke-width":l.on?l.w:1.5,"stroke-dasharray":l.on?"none":"5 7"};
+    for(const k in a)l.line.setAttribute(k,a[k]);
+  }
+  for(const k of PEER){
+    const n=FL.nodes[k], o=L[k];
+    if(o&&o.nets)n.info[0].textContent=[...o.nets.filter(isTun).map(x=>x.replace("/32","")),...o.nets.filter(x=>!isTun(x))].join(" · ");
+    n.c.setAttribute("stroke",on[k]?NODES[k].c:"#555");n.c.setAttribute("stroke-dasharray",on[k]?"none":"6 5");
+    n.t1.setAttribute("fill",on[k]?"#ddd":"#888");n.t2.setAttribute("fill",on[k]?"#ddd":"#888");
+    if(!on[k]){n.t1.textContent=stale?"keine Daten":"getrennt";n.t2.textContent=!stale&&o&&o.hs?"seit "+ago(Math.round(L.ts-o.hs)):"";continue}
+    setRate(n.t1,"↓",rate[k].out); setRate(n.t2,"↑",rate[k].in);
+  }
+  nodeDetails(L,on);
+  drawMap(L);
+  const S=L.server; FL.nodes.hub.t2.textContent=S?`CPU ${S.cpu.toFixed(0)} %`:"";
+  const rows=Object.entries(F).filter(([k,v])=>v*8/1e6>=0.01).sort((a,b)=>b[1]-a[1]);
+  document.getElementById("flowlist").innerHTML=stale?"":rows.length?rows.map(([k,v])=>{const [a,b]=k.split("_");
+    return `<span><i style="background:${(NODES[a]||{}).c||"#888"}"></i>${esc(NAME[a]||a)} → ${esc(NAME[b]||b)} <b>${num(v)} Mbit/s</b></span>`}).join(""):"<span>gerade kein nennenswerter Verkehr zwischen Internet und Standorten</span>";
+  if(S){const MiB=1048576,GiB=MiB*1024;document.getElementById("srv").textContent=
+    `Server: CPU ${S.cpu.toFixed(0)} % · Last ${de(S.load[0],2)} / ${de(S.load[1],2)} / ${de(S.load[2],2)} · RAM ${(S.mem_used/MiB).toFixed(0)} von ${(S.mem_total/MiB).toFixed(0)} MiB · Platte ${de(S.disk_used/GiB,1)} von ${(S.disk_total/GiB).toFixed(0)} GiB · läuft seit ${ago(Math.round(S.uptime))} · ${S.conns??"–"} offene Verbindungen`}
+}
+
+// ---- Zusatzzeilen an den Kreisen: öffentliche Adresse, online seit, Latenz, heute; Portwächter ----
+const dur=s=>s<3600?`${Math.max(1,Math.round(s/60))} min`:s<172800?`${Math.floor(s/3600)} h ${pad(Math.floor(s%3600/60))} min`:`${Math.floor(s/86400)} d ${Math.floor(s%86400/3600)} h`;
+const hm=ts=>{const d=new Date(ts*1000);return `${pad(d.getHours())}:${pad(d.getMinutes())}`};
+// Text aus farbigen Teilen [[text,farbe],…]
+function parts(t,arr){t.textContent="";for(const [x,c] of arr)sv("tspan",{fill:c||"#777"},t).textContent=x}
+function today(k){ // Bytes seit Mitternacht: [zum Standort, vom Standort]
+  if(!acct)return null;
+  const r=acct.names.indexOf(k+"_rx")+1, t=acct.names.indexOf(k+"_tx")+1; if(!r||!t)return null;
+  const m=new Date();m.setHours(0,0,0,0);const t0=m/1000;let a=0,b=0;
+  for(let i=acct.samples.length-1;i>=0&&acct.samples[i][0]>t0;i--){a+=acct.samples[i][t];b+=acct.samples[i][r]}
+  return [a,b];
+}
+function nodeDetails(L,on){
+  const P=PROBE, now=Date.now()/1000;
+  for(const k of SITES){
+    const n=FL.nodes[k], e=P&&P.endp&&P.endp[k], st=P&&P.state&&P.state[k], c=P&&P.cur&&P.cur[k];
+    if(e){const last=e.changes&&e.changes.length?e.changes[e.changes.length-1]:null, fresh=last&&now-last[0]<86400;
+      parts(n.info[1],[[`${e.ip}${e.provider?" · "+e.provider:""}`],...(fresh?[[` · neu seit ${hm(last[0])}`,"#e0a030"]]:[])])}
+    if(on[k]&&st&&st.up){
+      const a=[[`online seit ${st.exact?"":"mind. "}${dur(now-st.since)}`]];
+      if(c&&c.rtt!=null)a.push([" · "],[`${de(c.rtt,0)} ms`,c.rtt<60?"#8fbf6a":c.rtt<150?"#e0a030":"#d9534f"]);
+      if(c&&c.loss)a.push([` · ${de(c.loss,0)} % Verlust`,c.loss<20?"#e0a030":"#d9534f"]);
+      if(c&&c.rtt==null&&c.loss===100)a.push([" · keine Ping-Antwort","#888"]);
+      parts(n.info[2],a);
+    } else n.info[2].textContent="";
+    const d=today(k), tl=n.info[2].textContent?n.info[3]:n.info[2];
+    n.info[3].textContent=""; tl.textContent=d?`heute ↓ ${fmt(d[0])} ↑ ${fmt(d[1])}`:"";
+  }
+  // Internet: Portwächter und heutiges Volumen auf eth0
+  const n=FL.nodes.inet, pw=P&&P.ports, al=document.getElementById("alarm");
+  if(!pw){n.info[2].textContent=CFG.portwaechter?"Portwächter: erste Prüfung läuft":"";al.style.display="none"}
+  else{
+    const old=now-pw.ts>2400;
+    if(pw.unexpected.length){parts(n.info[2],[[`⚠ offen: ${pw.unexpected.join(", ")}`,"#ff6b66"]]);
+      al.style.display="block";const W=CFG.portwaechter||{};
+      al.innerHTML=`<b>Achtung:</b> Aus dem Internet erreichbar sind unerwartete Ports von ${esc(W.name||pw.host)}: <b>${pw.unexpected.join(", ")}</b> (geprüft ${hm(pw.ts)}). Erwartet sind nur ${pw.expected.join(", ")||"keine"}. ${esc(W.hinweis||"")}`}
+    else{parts(n.info[2],[[old?`Portwächter: letzte Prüfung ${hm(pw.ts)}`:`✓ von außen offen: ${pw.open.join(", ")||"nichts"}`,old?"#e0a030":"#8fbf6a"]]);al.style.display="none"}
+    n.info[2].onmouseenter=null;
+  }
+  const it=data&&data.interfaces&&data.interfaces.find(i=>i.name===CFG.internet), dd=it&&it.traffic.day[it.traffic.day.length-1], td=new Date();
+  n.info[3].textContent=dd&&dd.date.day===td.getDate()&&dd.date.month===td.getMonth()+1?`heute ↓ ${fmt(dd.tx)} ↑ ${fmt(dd.rx)}`:"";
+}
+
+// ---- Internet: Traffic nach Dienst ([[dienst]] in config.toml) ----
+let SVC=[];
+function renderSvc(){
+  if(!acct||SVC.length<2)return;
+  const ci=n=>acct.names.indexOf(n)+1, st=flowStart(), now=Date.now()/1000, MB=1048576;
+  const S=acct.samples.filter(s=>s[0]>=st), v=(s,p)=>s[ci(`s_${p}_in`)]+s[ci(`s_${p}_out`)];
+  const f=S.filter(s=>s[0]>now-48*3600);
+  mkN("cv5","line",f.map(s=>tsl(s[0])),SVC.map(([p,l,c])=>({l,c,d:f.map(s=>v(s,p)*8/300/1e6)})),"Mbit/s");
+  const D=new Map();for(const s of S){const k=dayl(s[0]),o=D.get(k)||{};for(const [p] of SVC)o[p]=(o[p]||0)+v(s,p);D.set(k,o)}
+  mkN("cvd","bar",[...D.keys()],SVC.map(([p,l,c])=>({l,c,d:[...D.values()].map(o=>o[p]/MB)})),"MiB");
+  const tot=Object.fromEntries(SVC.map(([p])=>[p,S.reduce((a,s)=>a+v(s,p),0)]));
+  const txt=S.length?SVC.filter(([p])=>tot[p]>0).map(([p,l])=>`${l} ${fmt(tot[p])}`).join(" · ")+` (rx+tx) seit ${tsl(st)}`:"Zählung läuft, erste Werte nach 5 min";
+  document.getElementById("tv5").textContent=txt;document.getElementById("tvd").textContent="Internet ↔ Standorte, nach Zielport der eingehenden Verbindung";
+}
+function projection(m){
+  if(!m.length)return;
+  const e=m[m.length-1],now=new Date(),st=new Date(e.date.year,e.date.month-1,1),en=new Date(e.date.year,e.date.month,1);
+  if(now<st||now>=en)return;
+  const fr=(now-st)/(en-st);
+  document.getElementById("tm").textContent+=` · ${st.toLocaleString("de-DE",{month:"long"})} hochgerechnet ${fmt((e.rx+e.tx)/fr)} (rx+tx, bisher ${fmt(e.rx+e.tx)})`;
+}
+
+// ---- Standort: Netze, Herkunft/Ziel, Verfügbarkeit, Latenz ----
+function siteInfo(k){
+  const o=LIVE&&LIVE[k]; if(!o||!o.nets)return;
+  const tun=o.nets.filter(isTun).map(n=>n.replace("/32","")), lan=o.nets.filter(n=>!isTun(n));
+  document.getElementById("siteinfo").innerHTML=`<b>Netze hinter ${esc(NAME[k])}:</b> ${lan.map(n=>`<code>${n}</code>`).join(" ")||"–"} &nbsp;·&nbsp; <b>Tunnel-Adresse:</b> ${tun.map(n=>`<code>${n}</code>`).join(" ")}<br><span>${esc((SITE[k]||{}).notiz||"")} Nur diese Netze werden durch den Tunnel geroutet.</span>`;
+}
+function renderSiteExtra(k){
+  siteInfo(k);
+  const now=Date.now()/1000, MB=1048576, ci=n=>acct.names.indexOf(n)+1, st=flowStart();
+  // Herkunft und Ziel pro Stunde: hinein positiv, hinaus negativ
+  const S=acct.samples.filter(s=>s[0]>=st&&s[0]>now-96*3600), others=PEER.filter(x=>x!==k);
+  const H=new Map();for(const s of S){const key=hourl(s[0]),o=H.get(key)||{};for(const x of others){o["i"+x]=(o["i"+x]||0)+s[ci(`f_${x}_${k}`)];o["o"+x]=(o["o"+x]||0)+s[ci(`f_${k}_${x}`)]}H.set(key,o)}
+  const V=[...H.values()], sets=[];
+  for(const x of others){
+    const a=V.map(o=>o["i"+x]/MB), b=V.map(o=>-o["o"+x]/MB);
+    if(a.some(Boolean))sets.push({l:`${NAME[x]} → ${NAME[k]}`,d:a,c:NODES[x].c});
+    if(b.some(Boolean))sets.push({l:`${NAME[k]} → ${NAME[x]}`,d:b,c:NODES[x].c+"77"});
+  }
+  mkN("csf","bar",[...H.keys()],sets.length?sets:[{l:"kein Verkehr",d:V.map(()=>0),c:"#555"}],"MiB (+ hinein / − hinaus)");
+  const all=acct.samples.filter(s=>s[0]>=st), sm=n=>all.reduce((a,s)=>a+s[ci(n)],0);
+  const part=(dir)=>others.map(x=>[x,sm(dir==="i"?`f_${x}_${k}`:`f_${k}_${x}`)]).filter(([,v])=>v>0).map(([x,v])=>`${NAME[x]} ${fmt(v)}`).join(", ")||"nichts";
+  document.getElementById("tsf").textContent=all.length?`Seit ${tsl(st)} hinein: ${part("i")} · hinaus: ${part("o")}`:"Zählung läuft, erste Werte nach 5 min";
+  if(!PROBE)return;
+  // Verfügbarkeit
+  const days=PROBE.days[k]||[], u=PROBE.uptime30[k];
+  mkC("cup",{type:"bar",data:{labels:days.map(([d])=>d.slice(8)+"."+d.slice(5,7)+"."),datasets:[{label:"verbunden",data:days.map(([,p])=>p),
+    backgroundColor:days.map(([,p])=>p>=99.9?"#7ac943":p>=99?"#e0a030":"#d9534f")}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>de(c.parsed.y,2)+" % verbunden"}}},scales:{y:{min:0,max:100,title:{display:true,text:"% der Minuten"}}}}});
+  const outs=(PROBE.outages[k]||[]).slice(-8).reverse();
+  document.getElementById("tup").textContent=u==null?"noch keine Messung":`30 Tage: ${de(u,2)} % verbunden · gemessen seit ${tsl(PROBE.since)} · verbunden = WireGuard-Handshake jünger als 3 min`;
+  document.getElementById("outl").innerHTML=outs.length?"<b>Letzte Ausfälle</b>"+outs.map(([a,b])=>`<li>${tsl(a)} – ${b?tsl(b).slice(8)+` (${ago(b-a)})`:"<b>dauert an</b>"}</li>`).join(""):"<li>keine Ausfälle seit Beginn der Messung</li>";
+  // Latenz
+  const Lt=PROBE.lat, d=Lt[k]||{rtt:[],loss:[]}, ok=d.rtt.filter(x=>x!=null);
+  mkC("clat",{type:"line",data:{labels:Lt.ts.map(tsl),datasets:[
+    {label:"Latenz (ms)",data:d.rtt,borderColor:NODES[k].c,backgroundColor:NODES[k].c+"22",fill:true,pointRadius:0,borderWidth:1.5,tension:.3,yAxisID:"y"},
+    {label:"Paketverlust (%)",data:d.loss,borderColor:"#d9534f",pointRadius:0,borderWidth:1,stepped:true,yAxisID:"y1"}]},
+    options:{responsive:true,interaction:{mode:"index",intersect:false},scales:{x:{ticks:{maxTicksLimit:12,maxRotation:0}},
+      y:{beginAtZero:true,title:{display:true,text:"ms"}},y1:{position:"right",min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:"% Verlust"}}}}});
+  const how=PROBE.how[k], m=how==="icmp"?"per Ping":how?`per TCP-Verbindungsaufbau auf Port ${how.split("/")[1]}`:"";
+  const loss=d.loss.filter(x=>x!=null);
+  document.getElementById("tlat").textContent=ok.length?`48 h: Mittel ${de(ok.reduce((a,b)=>a+b,0)/ok.length,1)} ms · max ${de(Math.max(...ok),1)} ms · Verlust ${de(loss.reduce((a,b)=>a+b,0)/(loss.length||1),1)} % · gemessen ${m}, jede Minute`
+    :loss.length?`Keine Antwort ${m} – die Gegenstelle verwirft Ping aus dem Tunnel (Freigabe dort nötig, oder ping_tcp setzen)`:"keine Messung, solange der Standort nicht verbunden ist";
+}
+// ---- Kartenansicht (Leaflet + OpenStreetMap), nutzt die Spuren und Texte des Schemas ----
+// Feste Orte aus config.json. Mobiler Standort: Ort aus der Mobilfunkzelle
+// (mastblick: /api/mast/status, https://github.com/wattnpapa/mastblick), nur als kleiner Punkt mit Unschärfekreis.
+let GEO={};
+let MAP=null, VIEW="schema", FGEO=null;
+async function loadFritzGeo(D){
+  if(!MOB)return; if(D)FGEO=D; else{if(sseFresh()&&FGEO)return; try{FGEO=await (await fetch("api/mast/status?t="+Date.now())).json()}catch(e){return}}
+  const g=FGEO&&FGEO.geo; if(g&&g.lat!=null)GEO[MOB]=[g.lat,g.lng];
+  const zc=FGEO&&FGEO.ok&&(FGEO.zellen||[])[0], zk=zc?zc.cellid:null;
+  if(MAP&&zk&&zk!==MAP.zelleAlt&&Date.now()-LINK_T>30000){LINK_T=Date.now();MAP.zelleAlt=zk;if(MAP.masten)loadMasten()}
+  if(MAP){placeFritz();drawLinks();renderFP()}
+}
+// Verbindungslinien: gelb laufend = Handy ↔ verbundener Mast, orange laufend = berechnete Box-Position ↔ Mast,
+// türkis gepunktet = Handy ↔ berechnete Box-Position (Ortungsfehler)
+let MAST_DB={}, MAST_VOR=[], LINK_T=0;
+function handyOrt(){return MAP.phone&&Date.now()/1000-MAP.phoneT<120?MAP.phone.getLatLng():MAP.me?MAP.me.getLatLng():null}
+function mastLinie(name,von,m,z,vor,farbe,breite,wer){
+  if(!von||!m){if(MAP[name]){MAP[name].remove();MAP[name]=null}return}
+  const ll=[[m.lat,m.lng],von], d=Math.round(von.distanceTo([m.lat,m.lng]));
+  const txt=`<b>${wer} ↔ Mast eNB ${z.enb} · Sektor ${z.sektor}</b>${vor?" (Mast nur vorgeschlagen)":""}<br>${d} m Luftlinie${z.distanz_m?` · Box meldet ${z.distanz_m} m`:""} · RSRP ${z.rsrp} dBm`;
+  const st={color:vor?"#c9b458":farbe,weight:breite};
+  if(!MAP[name])MAP[name]=L.polyline(ll,{...st,opacity:.95,dashArray:"7 11",className:"mflow lnkm"}).bindTooltip(txt,{sticky:true}).addTo(MAP.m);
+  else MAP[name].setLatLngs(ll).setTooltipContent(txt).setStyle(st);
+}
+function drawLinks(){
+  if(!MAP||!MAP.m)return; const z=FGEO&&FGEO.ok&&(FGEO.zellen||[])[0], g=FGEO&&FGEO.geo, ph=handyOrt();
+  let m=null, vor=false;
+  if(z){const k=`${z.plmn}:${z.enb}`; m=MAST_DB[`${k}:${z.sektor}`]||MAST_DB[k];
+    if(!m){m=MAST_VOR.find(v=>v.schluessel===`${k}:${z.sektor}`)||MAST_VOR.find(v=>v.schluessel===k);vor=!!m}}
+  const box=z&&g&&g.lat!=null?L.latLng(g.lat,g.lng):null;
+  mastLinie("lnkMast",ph,z?m:null,z,vor,"#ffd400",2.5,"Handy");
+  // ohne Abstand keine Linie (Box-Position ist bei bekanntem Mast oft der Mast selbst)
+  mastLinie("lnkBox",box&&m&&box.distanceTo([m.lat,m.lng])>30?box:null,z?m:null,z,vor,"#ff9a1f",2,`${esc(NAME[MOB])} (berechnet)`);
+  if(ph&&box){const ll=[ph,box], d=Math.round(ph.distanceTo(box));
+    const txt=`<b>Handy ↔ berechnete Box-Position</b><br>${d<1000?d+" m":(d/1000).toFixed(1).replace(".",",")+" km"} daneben · Quelle ${esc(g.quelle||"?")}`;
+    if(!MAP.lnkPh)MAP.lnkPh=L.polyline(ll,{color:"#3fd0d0",weight:2,opacity:.8,dashArray:"2 6"}).bindTooltip(txt,{sticky:true}).addTo(MAP.m);
+    else MAP.lnkPh.setLatLngs(ll).setTooltipContent(txt)}
+  else if(MAP.lnkPh){MAP.lnkPh.remove();MAP.lnkPh=null}
+}
+// Ortungs-Fokus: solange Handy-Tracking, Mitschreiben oder Folgen läuft, die festen Standorte und ihre Tunnel-Linien
+// ausblenden – sie laufen sonst quer über die Fahrstrecke
+function fokus(){
+  if(!MAP||!MAP.m)return; const an=!!((MAP.otState&&MAP.otState.an)||REC.on||FOLGEN);
+  if(an===MAP.fokus)return; MAP.fokus=an;
+  for(const [k,mk] of Object.entries(MAP.marks)){if(k===MOB)continue; an?mk.remove():mk.addTo(MAP.m)}
+  for(const ln of Object.values(MAP.links))for(const l of [ln.base,ln.in,ln.out])an?l.remove():l.addTo(MAP.m);
+}
+setInterval(drawLinks,15000);   // Handy-Position veraltet → Linien umhängen bzw. ausblenden
+function placeFritz(){
+  const p=GEO[MOB]; if(!p)return;
+  const acc=(FGEO.geo&&FGEO.geo.genauigkeit_m)||0;
+  const ring=!!(FGEO.geo&&FGEO.geo.mast);
+  const st=ring?{radius:acc,color:"#c04bd6",weight:2,opacity:.8,dashArray:"4 5",fill:false,interactive:false}
+               :{radius:acc,color:"#c04bd6",weight:1,opacity:.6,dashArray:null,fill:true,fillOpacity:.08,interactive:false};
+  if(!MAP.fcirc)MAP.fcirc=L.circle(p,st).addTo(MAP.m); else MAP.fcirc.setLatLng(p).setStyle(st).setRadius(acc);
+  if(!MAP.marks[MOB])addMark(MOB); else MAP.marks[MOB].setLatLng(p);
+  if(MAP.mob){MAP.mob.remove();MAP.mob=null}
+  const ln=MAP.links[MOB]; if(ln){ln.base.setLatLngs([GEO.hub,p]);ln.in.setLatLngs([p,GEO.hub]);ln.out.setLatLngs([GEO.hub,p])}
+}
+setInterval(loadFritzGeo,60000);
+// ---- Mobiler Standort: Track und "Mast ermitteln" (mastblick-API unter api/mast) ----
+let TRACK_H=0, TRACK_Q="", ABSCHNITTE=[], ABDECKUNG=false, MS=null, FP_OPEN=null, OM_OPEN=false, ME_WATCH=null, FOLGEN=false;
+let FP_ZU=(()=>{try{const v=localStorage.getItem("fpZu");return v===null?innerWidth<700:v==="1"}catch(e){return innerWidth<700}})();
+// Mitschreiben: Handy-GPS laufend an mastblick, Bildschirm bleibt an (Wake Lock), Box fragt dann alle 15 s ab
+const REC={on:false,watch:null,buf:[],n:0,last:null,wake:null,err:"",timer:null};
+async function recStart(){
+  if(!isSecureContext||!navigator.geolocation){REC.err=`Nur ${HTTPS_TXT()} möglich.`;return renderFP()}
+  REC.on=true;REC.err="";
+  REC.watch=navigator.geolocation.watchPosition(p=>{const c=p.coords;REC.last=c;REC.buf.push({t:p.timestamp||Date.now(),lat:c.latitude,lng:c.longitude,acc:c.accuracy,speed:c.speed,heading:c.heading});recInfo();showMe(c,true)},
+    e=>{REC.err=e.message;recInfo()},{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+  REC.timer=setInterval(recFlush,15000);
+  try{REC.wake=await navigator.wakeLock.request("screen")}catch(e){}
+  renderFP();
+}
+// Eigener Standort (blauer Punkt mit Genauigkeitskreis), Live-Linie beim Mitschreiben, Folgen-Modus
+function showMe(c,trail){
+  if(!MAP)return; const p=[c.latitude,c.longitude];
+  if(!MAP.me){MAP.meAcc=L.circle(p,{radius:c.accuracy,color:"#2f8cff",weight:1,fillOpacity:.12,interactive:false}).addTo(MAP.m);
+    MAP.me=L.marker(p,{icon:L.divIcon({className:"mme",iconSize:[14,14],iconAnchor:[7,7]}),keyboard:false,zIndexOffset:1000,title:"mein Standort"}).addTo(MAP.m)}
+  else{MAP.me.setLatLng(p);MAP.meAcc.setLatLng(p).setRadius(c.accuracy)}
+  if(trail&&c.accuracy<=50){if(!MAP.live)MAP.live=L.polyline([],{color:"#7ac943",weight:3,opacity:.9,interactive:false}).addTo(MAP.m);MAP.live.addLatLng(p)}
+  if(FOLGEN)MAP.m.panTo(p,{animate:true});
+  drawLinks();
+}
+function meToggle(){
+  if(ME_WATCH!==null||FOLGEN){FOLGEN=false;if(ME_WATCH!==null&&!REC.on){navigator.geolocation.clearWatch(ME_WATCH)}ME_WATCH=null;meBtn();return}
+  if(!isSecureContext||!navigator.geolocation){alert(`Standort nur ${HTTPS_TXT()}`);return}
+  FOLGEN=true; if(!REC.on)ME_WATCH=navigator.geolocation.watchPosition(p=>showMe(p.coords,false),()=>{},{enableHighAccuracy:true,maximumAge:5000});
+  else ME_WATCH=-1; if(REC.last)showMe(REC.last,false); meBtn();
+}
+function meBtn(){const b=document.getElementById("mebtn");if(b)b.classList.toggle("on",FOLGEN);fokus()}
+function fullToggle(force){const el=document.getElementById("map");const on=force===undefined?!el.classList.contains("full"):force;
+  el.classList.toggle("full",on);document.body.style.overflow=on?"hidden":"";const b=document.getElementById("fullbtn");if(b){b.classList.toggle("on",on);b.textContent=on?"✕":"⛶"}
+  setTimeout(()=>MAP.m.invalidateSize(),50)}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&document.getElementById("map").classList.contains("full"))fullToggle(false)});
+setInterval(()=>{if(MAP&&TRACK_H&&VIEW==="karte"&&!sseFresh())loadTrack(true)},60000);
+// Neue Handy-Positionen per Push: Live-Marker für alle Betrachter, Track höchstens alle 10 s nachladen
+let GPS_TL=0;
+function gpsLive(pts){
+  if(!MAP||!pts.length)return; const q=pts[pts.length-1], p=[q[1],q[2]];
+  const txt=`Handy (${q[4]==="owntracks"?"OwnTracks":q[4]==="browser"?"Browser":"GPS"}) ±${q[3]} m · ${tfmt(q[0])}`;
+  if(!MAP.phone)MAP.phone=L.circleMarker(p,{radius:6,color:"#fff",weight:2,fillColor:"#3fd0d0",fillOpacity:1}).bindTooltip(txt).addTo(MAP.m);
+  else MAP.phone.setLatLng(p).setTooltipContent(txt);
+  MAP.phoneT=q[0]; drawLinks();
+  if(TRACK_H&&Date.now()-GPS_TL>10000){GPS_TL=Date.now();loadTrack(true)}
+}
+async function recFlush(){
+  if(!REC.buf.length)return; const b=REC.buf.splice(0,500);
+  try{const r=await api("api/mast/gps",{punkte:b});REC.n+=r.gespeichert;REC.err=""}catch(e){REC.buf.unshift(...b);REC.err="Senden fehlgeschlagen, wird wiederholt ("+e.message+")"}
+  recInfo();
+}
+function recStop(){navigator.geolocation.clearWatch(REC.watch);clearInterval(REC.timer);recFlush();if(REC.wake)REC.wake.release().catch(()=>{});REC.on=false;REC.wake=null;renderFP()}
+function recInfo(){const e=document.getElementById("recinfo");if(!e)return;const c=REC.last;
+  e.innerHTML=`${REC.n} gesendet, ${REC.buf.length} wartend${c?` · ±${Math.round(c.accuracy)} m${c.speed!=null?` · ${Math.round(c.speed*3.6)} km/h`:""}`:" · warte auf GPS"}${REC.err?`<div class="msg">${esc(REC.err)}</div>`:""}`}
+document.addEventListener("visibilitychange",async()=>{if(REC.on&&document.visibilityState==="visible"){try{REC.wake=await navigator.wakeLock.request("screen")}catch(e){}}});
+const api=async(u,b)=>{const r=await fetch(u,b?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}:{});const j=await r.json().catch(()=>({fehler:"HTTP "+r.status}));if(!r.ok)throw new Error(j.fehler||("HTTP "+r.status));return j};
+const tfmt=s=>new Date(s*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+const esc=t=>String(t??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const HTTPS_TXT=()=>CFG.https_adresse?`über ${CFG.https_adresse}`:"über HTTPS";
+// CellMapper-Link mit MCC/MNC aus der PLMN der aktuellen Zelle
+const cmLink=(lat,lng)=>{const p=String(((FGEO&&FGEO.zellen)||[{}])[0].plmn||"26201");return `https://www.cellmapper.net/map?MCC=${p.slice(0,3)}&MNC=${+p.slice(3)}&type=LTE&latitude=${lat}&longitude=${lng}&zoom=14`};
+function addFritzPanel(){
+  const C=L.Control.extend({onAdd(){const d=L.DomUtil.create("div","fp");L.DomEvent.disableClickPropagation(d);L.DomEvent.disableScrollPropagation(d);return d}});
+  MAP.fp=new C({position:"topright"}).addTo(MAP.m);
+  const B=L.Control.extend({onAdd(){const d=L.DomUtil.create("div","leaflet-bar mctl");
+    d.innerHTML='<a id="fullbtn" title="Vollbild">⛶</a><a id="mebtn" title="mein Standort, Karte folgt">◎</a>';L.DomEvent.disableClickPropagation(d);
+    d.querySelector("#fullbtn").onclick=()=>fullToggle();d.querySelector("#mebtn").onclick=meToggle;return d}});
+  new B({position:"topleft"}).addTo(MAP.m);
+  MAP.m.on("dragstart",()=>{if(FOLGEN){FOLGEN=false;meBtn()}});
+  MAP.track=L.layerGroup().addTo(MAP.m); MAP.obs=L.layerGroup().addTo(MAP.m); MAP.masten=L.layerGroup().addTo(MAP.m);
+  renderFP(); loadMast(); loadMasten(); loadOT(); loadAbschnitte(); setInterval(loadAbschnitte,300000); loadAusw(); setInterval(loadAusw,300000); setInterval(()=>{if(!sseFresh())loadOT()},30000);
+}
+// Bekannte Masten aus der eigenen Datenbank als kleines Antennen-Symbol (Sektor-Einträge mit grüner Spitze)
+const MAST_SVG=(c,s="#ddd")=>`<svg width="12" height="16" viewBox="0 0 12 16"><path d="M6 3 L2.5 15 M6 3 L9.5 15 M3.6 11 H8.4 M4.4 7.5 H7.6" stroke="${s}" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="6" cy="2.4" r="1.9" fill="${c}"/></svg>`;
+async function loadMasten(){
+  let m; try{m=await api("api/mast/masten")}catch(e){return}
+  MAP.masten.clearLayers(); MAST_DB=m;
+  for(const [k,v] of Object.entries(m)){const [pl,enb,sek]=k.split(":");
+    L.marker([v.lat,v.lng],{icon:L.divIcon({className:"mmast",html:MAST_SVG(sek?"#7ac943":"#e0a040"),iconSize:[12,16],iconAnchor:[6,15]}),keyboard:false,zIndexOffset:-500})
+     .bindTooltip(`<b>Mast eNB ${enb}${sek?` · Sektor ${sek}`:""}</b> <span style="color:#999">(${pl})</span>${v.notiz?`<br>${esc(v.notiz)}`:""}<br><span style="color:#999">${esc(v.quelle)} · ${esc(v.erfasst)}</span>`).addTo(MAP.masten)}
+  // Vorschläge aus den Messpaaren (Handy-GPS + Abstand): grau, Klick zum Übernehmen oder Verwerfen
+  let vs=[]; try{vs=await api("api/mast/vorschlaege")}catch(e){}
+  MAST_VOR=vs; drawLinks();
+  for(const v of vs){const [pl,enb,sek]=v.schluessel.split(":");
+    const txt=`<b>Vorschlag: Mast eNB ${enb}${sek?` · Sektor ${sek}`:""}</b><br>berechnet aus ${v.anzahl} Messungen, Restfehler ±${v.rms_m} m${v.eindeutig?"":`<br><span style="color:#c60">mehrdeutig: Messpunkte fast auf einer Linie, Mast kann auch gespiegelt auf der anderen Straßenseite stehen</span>`}`;
+    const mk=L.marker([v.lat,v.lng],{icon:L.divIcon({className:"mmast vor",html:MAST_SVG(v.eindeutig?"#bbb":"#c60","#999"),iconSize:[12,16],iconAnchor:[6,15]}),keyboard:false,zIndexOffset:-600}).bindTooltip(txt+"<br><i>Klick: übernehmen oder verwerfen</i>").addTo(MAP.masten);
+    const box=L.DomUtil.create("div","vpop"); box.innerHTML=txt+`<br><button data-a="ok">übernehmen</button><button data-a="no">verwerfen</button><div class="m"></div>`;
+    box.querySelectorAll("button").forEach(b=>b.onclick=async()=>{try{
+      if(b.dataset.a==="ok")await api("api/mast/setzen",{schluessel:v.schluessel,lat:v.lat,lng:v.lng,quelle:`angelernt aus ${v.anzahl} Messfahrt-Punkten (±${v.rms_m} m${v.eindeutig?"":", mehrdeutig"})`});
+      else await api("api/mast/verwerfen",{schluessel:v.schluessel});
+      MAP.m.closePopup(); loadMasten(); loadMast(); setTimeout(loadFritzGeo,4000); if(TRACK_H)loadTrack();
+    }catch(e){box.querySelector(".m").textContent=e.message}});
+    mk.bindPopup(box);
+  }
+}
+async function loadOT(){try{MAP.otState=await api("api/mast/tracking");renderFP()}catch(e){}}
+async function loadAbschnitte(){try{ABSCHNITTE=await api("api/mast/abschnitte");renderFP()}catch(e){}}
+// Netzabdeckung: Kacheln ~110 m, Farbe nach Median-RSRP der primären Zelle
+const RSRP_F=r=>r>=-80?"#2ecc40":r>=-90?"#9be15d":r>=-100?"#ffdc00":r>=-110?"#ff851b":"#ff4136";
+async function loadAbdeckung(){
+  if(!MAP.abd)MAP.abd=L.layerGroup(); MAP.abd.clearLayers();
+  if(!ABDECKUNG){MAP.abd.remove();if(MAP.abdLeg){MAP.abdLeg.remove();MAP.abdLeg=null}return}
+  MAP.abd.addTo(MAP.m); let k=[]; try{k=await api("api/mast/abdeckung")}catch(e){return}
+  for(const c of k)L.rectangle([[c.lat-.0005,c.lng-.0008],[c.lat+.0005,c.lng+.0008]],{stroke:false,fillColor:RSRP_F(c.rsrp),fillOpacity:Math.min(.65,.25+c.n*.05)})
+    .bindTooltip(`RSRP ${c.rsrp} dBm${c.rsrq!=null?` · RSRQ ${c.rsrq} dB`:""}<br>${c.n} Messung${c.n===1?"":"en"} · eNB ${c.enb.join(", ")}`).addTo(MAP.abd);
+  if(!MAP.abdLeg){const G=L.Control.extend({onAdd(){const d=L.DomUtil.create("div","fp");d.style.width="auto";
+    d.innerHTML="<b>RSRP</b> "+[[-80,"≥ −80"],[-90,"−90"],[-100,"−100"],[-110,"−110"],[-120,"< −110"]].map(([r,t])=>`<span style="color:${RSRP_F(r)}">■</span> ${t}`).join(" ");return d}});
+    MAP.abdLeg=new G({position:"bottomright"}).addTo(MAP.m)}
+}
+// ---- Auswertungen (API /api/mast/auswertung): Ortungsgüte, Funklöcher/Latenz, Versorgungsgebiete, Masten nachschärfen ----
+let AUSW=null, L_FUNK=false, L_GEB=false, AUSW_OPEN=false;
+async function loadAusw(){try{AUSW=await api("api/mast/auswertung")}catch(e){AUSW={fehler:e.message}} drawFunk();drawGeb();drawKorr();renderFP()}
+const RTT_F=r=>r<60?"#2ecc40":r<120?"#9be15d":r<250?"#ffdc00":r<500?"#ff851b":"#ff4136";
+function drawFunk(){
+  if(!MAP.funk)MAP.funk=L.layerGroup(); MAP.funk.clearLayers();
+  if(!L_FUNK||!AUSW||AUSW.fehler){MAP.funk.remove();return} MAP.funk.addTo(MAP.m);
+  for(const c of AUSW.funk){const b=[[c.lat-.0005,c.lng-.0008],[c.lat+.0005,c.lng+.0008]];
+    // Ausfälle grau bis schwarz (Anteil der GPS-Punkte ohne Antwort der Box), sonst Farbe nach Ping-Laufzeit
+    const anteil=c.n?c.aus/c.n:0;
+    const st=c.aus?{stroke:true,color:"#000",weight:1,fillColor:anteil>.5?"#111":"#666",fillOpacity:.75}:{stroke:false,fillColor:RTT_F(c.rtt),fillOpacity:.55};
+    L.rectangle(b,st).bindTooltip(`${c.aus?`<b>Box ohne Antwort</b>: ${c.aus} von ${c.n} GPS-Punkten<br>`:""}${c.rtt!=null?`Ping zur Box ${c.rtt} ms (Median aus ${c.rtt_n})`:"keine Ping-Messung"}`).addTo(MAP.funk)}
+  for(const a of AUSW.abbrueche)L.circleMarker([a.lat,a.lng],{radius:5,color:"#fff",weight:1,fillColor:"#000",fillOpacity:1})
+    .bindTooltip(`<b>Abbruch</b> ${tfmt(a.t)}<br>Box antwortete ${a.dauer_s?"ca. "+Math.max(1,Math.round(a.dauer_s/60))+" min":"kurz"} nicht`).addTo(MAP.funk);
+}
+const GEB_F=k=>{let h=0;for(const c of k)h=(h*31+c.charCodeAt(0))%360;return `hsl(${h},70%,55%)`};
+function drawGeb(){
+  if(!MAP.geb)MAP.geb=L.layerGroup(); MAP.geb.clearLayers();
+  if(!L_GEB||!AUSW||AUSW.fehler){MAP.geb.remove();return} MAP.geb.addTo(MAP.m);
+  for(const g of AUSW.gebiete){const [pl,enb,sek]=g.schluessel.split(":"),f=GEB_F(g.schluessel);
+    (g.huelle.length>2?L.polygon(g.huelle,{color:f,weight:1.5,fillColor:f,fillOpacity:.12}):L.circleMarker([g.lat,g.lng],{radius:4,color:f}))
+      .bindTooltip(`<b>eNB ${enb} · Sektor ${sek}</b><br>hier verbunden an ${g.n} Messpunkten`,{sticky:true}).addTo(MAP.geb)}
+  for(const w of AUSW.wechsel){const v=w.von.split(":"),n=w.nach.split(":");
+    L.circleMarker([w.lat,w.lng],{radius:w.pingpong?4:3,color:w.pingpong?"#ff4136":"#fff",weight:1,fillColor:w.pingpong?"#ff4136":"#888",fillOpacity:.9})
+      .bindTooltip(`<b>Zellwechsel</b> ${tfmt(w.t)}<br>eNB ${v[1]}/${v[2]} → ${n[1]}/${n[2]}${w.pingpong?"<br><span style='color:#ff4136'>Ping-Pong: innerhalb 2 min zurück</span>":""}`).addTo(MAP.geb)}
+}
+// Nachschärfen: Vorschlag als gestrichelte Linie alter → neuer Ort, übernehmen nur per Klick
+function drawKorr(){
+  if(!MAP.korr)MAP.korr=L.layerGroup().addTo(MAP.m); MAP.korr.clearLayers();
+  if(!AUSW||AUSW.fehler)return;
+  for(const k of AUSW.masten.filter(x=>x.vorschlag)){const [pl,enb,sek]=k.schluessel.split(":");
+    L.polyline([[k.alt.lat,k.alt.lng],[k.neu.lat,k.neu.lng]],{color:"#e0a040",weight:1.5,dashArray:"3 4",interactive:false}).addTo(MAP.korr);
+    const txt=korrText(k);
+    const mk=L.marker([k.neu.lat,k.neu.lng],{icon:L.divIcon({className:"mmast vor",html:MAST_SVG("#e0a040","#e0a040"),iconSize:[12,16],iconAnchor:[6,15]}),keyboard:false,zIndexOffset:-550}).bindTooltip(txt+"<br><i>Klick: übernehmen oder verwerfen</i>").addTo(MAP.korr);
+    const box=L.DomUtil.create("div","vpop"); box.innerHTML=txt+korrBtns(k.schluessel)+`<div class="m"></div>`;
+    box.querySelectorAll("button").forEach(b=>b.onclick=()=>korrAktion(b.dataset,box.querySelector(".m"))); mk.bindPopup(box)}
+}
+function korrText(k){const [pl,enb,sek]=k.schluessel.split(":");
+  return `<b>Nachschärfen: Mast eNB ${enb}${sek?` · Sektor ${sek}`:""}</b><br>${k.verschiebung_m} m verschieben · aus ${k.anzahl} Abstandsringen<br>Restfehler jetzt ±${k.rms_alt_m} m → neu ±${k.rms_neu_m} m · Konfidenz <b>${k.konfidenz}</b>${k.eindeutig?"":`<br><span style="color:#c60">mehrdeutig: Messpunkte fast auf einer Linie, Spiegellösung möglich</span>`}`}
+const korrBtns=s=>`<br><button data-a="ok" data-s="${esc(s)}">übernehmen</button><button data-a="no" data-s="${esc(s)}">verwerfen</button>`;
+async function korrAktion(d,m){const k=AUSW.masten.find(x=>x.schluessel===d.s); if(!k)return;
+  try{if(d.a==="ok")await api("api/mast/setzen",{schluessel:k.schluessel,lat:k.neu.lat,lng:k.neu.lng,quelle:`nachgeschärft aus ${k.anzahl} Abstandsringen (±${k.rms_neu_m} m, Konfidenz ${k.konfidenz})`});
+    else await api("api/mast/verwerfen",{schluessel:`korr:${k.schluessel}:${k.anzahl}`});
+    MAP.m.closePopup(); loadAusw(); loadMasten(); loadMast(); setTimeout(loadFritzGeo,4000)}catch(e){if(m)m.textContent=e.message}}
+// Gütekurve: Median-Fehler je Fahrt als kleine Balken (lila = angezeigt, grün = Zellschwerpunkt, blau = Fingerabdruck)
+const mb=b=>b>=1e9?(b/1e9).toFixed(2).replace(".",",")+" GB":(b/1e6).toFixed(1).replace(".",",")+" MB";
+function fahrtenPanel(){
+  const F=(AUSW&&AUSW.fahrten||[]).filter(f=>f.box_b||f.wg_b); if(!F.length)return "";
+  return `<div style="margin-top:.3rem"><b>Datenmenge je Fahrt</b></div><table class="gt"><tr><th>Fahrt</th><th>Dauer</th><th>Box ↓/↑</th><th>Tunnel</th></tr>${F.slice(-8).reverse().map(f=>`<tr><td>${tfmt(f.von)}</td><td>${Math.max(1,Math.round((f.bis-f.von)/60))} min</td><td>${f.box_b?mb(f.box_b[0])+" / "+mb(f.box_b[1]):"–"}</td><td>${f.wg_b?mb(f.wg_b[0]+f.wg_b[1]):"–"}</td></tr>`).join("")}</table><div class="sub">Box = alles über Mobilfunk seit dem Einschalten (laut FRITZ!Box), Tunnel = davon über WireGuard zum ${esc(CFG.hub.name)}.</div>`;
+}
+const km=v=>v<1000?v+" m":(v/1000).toFixed(1).replace(".",",")+" km";
+// Wie gut sind BeaconDB/OpenCelliD für unsere Strecken – je Tag neu nachgeschlagen, wird es mit unseren Meldungen besser?
+function freiVerlauf(){const V=Object.entries(AUSW.frei_verlauf||{}).slice(-7); if(!V.length)return "";
+  return `<div class="sub">Freie Daten je Tag (Median, alle Fahrten): ${V.map(([d,v])=>`${d.slice(8,10)}.${d.slice(5,7)}. BeaconDB ${v.bdb!=null?km(v.bdb):"–"} · OpenCelliD ${v.ocid!=null?km(v.ocid):"–"}`).join(" | ")}</div>`}
+function guetePanel(){
+  if(!AUSW)return `<div class="sub">lade …</div>`; if(AUSW.fehler)return `<div class="msg">${esc(AUSW.fehler)}</div>`;
+  const G=AUSW.guete; if(!G.length)return `<div class="sub">noch keine Fahrt mit Handy-GPS</div>`;
+  const reihen=[["angezeigt","#c04bd6","damals angezeigt"],["zellschwerpunkt","#7ac943","eigene Zelldaten"],["fingerabdruck","#2f8cff","Fingerabdruck"],["frei","#9a9a9a","freie Daten"]];
+  const max=Math.max(...G.flatMap(f=>reihen.slice(0,3).map(([k])=>f[k].median||0)),500), W=230, bw=Math.max(2,Math.min(9,Math.floor((W-10)/G.length/4.5)));
+  let svg=`<svg width="${W}" height="70" style="display:block;margin:.2rem 0">`;
+  G.forEach((f,i)=>reihen.forEach(([k,c],j)=>{const v=(f[k]||{}).median;if(v==null)return;const h=Math.max(1,60*Math.min(v,max)/max),x=4+i*(bw*4.5)+j*bw;
+    svg+=`<rect x="${x}" y="${62-h}" width="${bw-1}" height="${h}" fill="${c}"><title>${tfmt(f.von)}: ${v} m (${f[k].n} Punkte)</title></rect>`}));
+  svg+=`<text x="${W-2}" y="9" fill="#888" font-size="9" text-anchor="end">${(max/1000).toFixed(1)} km</text></svg>`;
+  const l=G[G.length-1];
+  return svg+`<div class="sub">${reihen.map(([k,c,t])=>`<span style="color:${c}">■</span> ${t}`).join(" · ")}</div>`+
+    `<table class="gt"><tr><th>Fahrt</th><th>Pkt</th><th>angez.</th><th>Zelle</th><th>Fp</th><th>frei</th></tr>${G.slice(-8).reverse().map(f=>`<tr><td>${tfmt(f.von)}</td><td>${f.n}</td>${reihen.map(([k])=>{const v=(f[k]||{}).median;return `<td${k==="frei"&&f.frei_ocid&&f.frei_ocid.median!=null?` title="OpenCelliD: ${km(f.frei_ocid.median)}"`:""}>${v!=null?km(v):"–"}</td>`}).join("")}</tr>`).join("")}</table>`+freiVerlauf()+
+    `<div class="sub">Median-Fehler gegen Handy-GPS. Eigene Zelldaten und Fingerabdruck jeweils nur aus den <i>anderen</i> Fahrten gelernt. Fingerabdruck ist noch nicht für die Ortung aktiv (90-%-Wert bisher schlechter). „frei“ = nur BeaconDB (OpenCelliD beim Drüberfahren), mit dem heutigen Stand der Datenbank nachgeschlagen; große Werte sind gekappt.</div>`;
+}
+function korrPanel(){
+  if(!AUSW||AUSW.fehler||!AUSW.masten.length)return "";
+  return `<div style="margin-top:.3rem"><b>Masten nachschärfen</b></div>`+AUSW.masten.map(k=>{const [pl,enb,sek]=k.schluessel.split(":");
+    const n=`eNB ${enb}${sek?"/"+sek:""}`;
+    if(k.vorschlag)return `<div class="om">${korrText(k)}${korrBtns(k.schluessel)}</div>`;
+    if(!k.neu)return `<div class="sub">${n}: ${k.anzahl} Ringe, Restfehler ±${k.rms_alt_m} m${k.rms_alt_m>600?` – <span style="color:#e0a040">passt nicht zu den Messungen</span>`:""}, keine sichere Neuberechnung</div>`;
+    return `<div class="sub">${n}: passt (±${k.rms_alt_m} m aus ${k.anzahl} Ringen${k.verschiebung_m>150?`, Neuberechnung ${k.verschiebung_m} m daneben, aber nicht besser`:""})</div>`}).join("");
+}
+async function loadMast(){try{MS=await api("api/mast")}catch(e){MS={ok:false,fehler:e.message}} renderFP()}
+async function loadTrack(still){
+  if(!TRACK_H){MAP.track.clearLayers();MAP.trackData=null;renderFP();return}
+  let d; try{d=await api("api/mast/verlauf?"+TRACK_Q)}catch(e){MAP.trackData={fehler:e.message};renderFP();return}
+  MAP.track.clearLayers(); if(still&&MAP.live&&REC.on)MAP.live.setLatLngs([]);
+  MAP.trackData=d; const pts=d.punkte.filter(p=>p.lat!=null);
+  // Handy-GPS (Wahrheit) als grüne Linie, bei Lücken > 5 min getrennt
+  // je Quelle eigene Farbe; neue Linie bei Lücke > 5 min oder Quellenwechsel
+  const QF={browser:"#7ac943",owntracks:"#3fd0d0",alt:"#9bc77f"}, QN={browser:"Browser-Mitschreiben",owntracks:"OwnTracks",alt:"ohne Quellenangabe"};
+  const segs=[];let cur=null;(d.gps||[]).forEach((q,i,a)=>{const qu=q[4]||"alt";if(!cur||q[0]-a[i-1][0]>300||qu!==cur.q){cur={q:qu,p:[]};segs.push(cur)}cur.p.push([q[1],q[2]])});
+  segs.filter(s=>s.p.length>1).forEach(s=>L.polyline(s.p,{color:QF[s.q]||"#7ac943",weight:3,opacity:.85}).bindTooltip(`Handy-GPS: ${QN[s.q]||s.q}`,{sticky:true}).addTo(MAP.track));
+  MAP.gpsQuellen=[...new Set((d.gps||[]).map(q=>q[4]||"alt"))];
+  // von Hand nachgetragene Strecken (nicht gemessen, werden nicht gemeldet)
+  (d.strecken||[]).forEach(s=>{if(s.punkte.length>1)L.polyline(s.punkte,{color:"#cfcfcf",weight:3,opacity:.75,dashArray:"2 6"}).bindTooltip(`<b>${esc(s.name)}</b><br>${esc(s.quelle)}`).addTo(MAP.track)});
+  if(pts.length>1)L.polyline(pts.map(p=>[p.lat,p.lng]),{color:"#c04bd6",weight:3,opacity:.7,dashArray:"6 6",interactive:false}).addTo(MAP.track);
+  pts.forEach((p,i)=>{const last=i===pts.length-1;
+    L.circleMarker([p.lat,p.lng],{radius:last?7:5,color:p.quelle==="mast"?"#c04bd6":"#e0a040",weight:2,fillColor:p.quelle==="mast"?"#c04bd6":"#161616",fillOpacity:p.quelle==="mast"?.9:.6})
+     .bindTooltip(`<b>${tfmt(p.von)}${p.bis>p.von?" – "+tfmt(p.bis):""}</b><br>eNB ${p.enb} (${esc(p.cellid)})${p.distanz_m?" · "+p.distanz_m+" m zum Mast":""}<br>${p.quelle==="mast"?"Mast aus eigener Datenbank":"nur Zellschätzung ±"+((p.genauigkeit_m||0)/1000).toFixed(1)+" km"}`).addTo(MAP.track)});
+  const all=pts.map(p=>[p.lat,p.lng]).concat((d.gps||[]).map(q=>[q[1],q[2]]),...(d.strecken||[]).map(s=>s.punkte));
+  if(all.length&&!still&&!FOLGEN)MAP.m.fitBounds(L.latLngBounds(all).pad(.15),{maxZoom:13});
+  renderFP();
+}
+function mastForm(key,lat,lng){
+  return `<div style="margin-top:.25rem">${lat!=null?`<a href="${cmLink(lat,lng)}" target="_blank" rel="noopener">in CellMapper nachsehen</a> · `:""}<a href="https://www.bundesnetzagentur.de/emf" target="_blank" rel="noopener">EMF-Karte BNetzA</a></div>
+   <div style="margin-top:.25rem"><input placeholder="52.5163, 13.3777" data-key="${esc(key)}"><button class="pri" data-act="save" data-key="${esc(key)}">Mast speichern</button></div>`+
+   (key===""&&MS&&MS.zelle?`<label class="sub"><input type="checkbox" id="fpsek" style="width:auto"> nur für Sektor ${MS.zelle.sektor} (abgesetzte Antenne)</label>`:"");
+}
+function renderFP(){
+  if(!MAP||!MAP.fp)return; fokus(); const el=MAP.fp.getContainer(), g=FGEO&&FGEO.geo;
+  // nicht neu aufbauen, solange ein Dropdown oder Eingabefeld im Feld benutzt wird (Push kommt alle paar Sekunden)
+  const ae=document.activeElement; if(ae&&el.contains(ae)&&/^(SELECT|INPUT)$/.test(ae.tagName)){clearTimeout(MAP.fpT);MAP.fpT=setTimeout(renderFP,1500);return}
+  el.classList.toggle("zu",FP_ZU);
+  const kurz=REC.on?"● schreibt mit":MS&&MS.ok?(MS.mast?"Mast bekannt":"nur Schätzung"):"";
+  let h=`<div class="fphead" data-act="fold"><b>${esc(NAME[MOB])}</b><small>${kurz} ${FP_ZU?"▸":"▾"}</small></div><div class="fpbody"><div class="sub">Track: <select id="tracksel" style="background:#111;color:#ddd;border:1px solid #444;border-radius:5px;font-size:11px;max-width:170px">
+    <option value="">aus</option>${[2,6,24].map(x=>`<option value="h=${x}"${TRACK_Q==="h="+x?" selected":""}>letzte ${x} h (live)</option>`).join("")}
+    ${AUSW&&AUSW.fahrten&&AUSW.fahrten.length?`<optgroup label="Fahrten (Box eingeschaltet)">${AUSW.fahrten.slice().reverse().map(f=>{const v=`von=${f.von-60}&bis=${f.bis+60}`,a=new Date(f.von*1000),b=new Date(f.bis*1000),hm=d=>d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+      return `<option value="${v}"${TRACK_Q===v?" selected":""}>${a.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})} ${hm(a)}–${hm(b)} · ${Math.max(1,Math.round((f.bis-f.von)/60))} min${f.gps?" · GPS":""}${f.box_b?` · ${mb(f.box_b[0]+f.box_b[1])}`:f.wg_b?` · Tunnel ${mb(f.wg_b[0]+f.wg_b[1])}`:""}</option>`}).join("")}</optgroup>`:""}
+    ${ABSCHNITTE.length?`<optgroup label="2-h-Abschnitte">${ABSCHNITTE.map(a=>{const v=`von=${a.von}&bis=${a.bis}`,d=new Date(a.von*1000);
+      return `<option value="${v}"${TRACK_Q===v?" selected":""}>${d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"})} ${String(d.getHours()).padStart(2,"0")}–${String((d.getHours()+2)%24).padStart(2,"0")} Uhr · ${a.gps?a.gps+" GPS":a.zellen+" Zellen"}</option>`}).join("")}</optgroup>`:""}
+  </select></div><div class="sub"><label><input type="checkbox" id="abdsel" style="width:auto"${ABDECKUNG?" checked":""}> Netzabdeckung (eigene Messungen)</label></div>
+  <div class="sub"><label><input type="checkbox" id="funksel" style="width:auto"${L_FUNK?" checked":""}> Funklöcher &amp; Ping-Laufzeit</label></div>
+  <div class="sub"><label><input type="checkbox" id="gebsel" style="width:auto"${L_GEB?" checked":""}> Versorgungsgebiete &amp; Zellwechsel</label></div>
+  <button data-act="auswfold">${AUSW_OPEN?"Auswertung ausblenden":"Ortungsgüte &amp; Masten nachschärfen"}${AUSW&&!AUSW.fehler&&AUSW.masten.some(x=>x.vorschlag)?" ●":""}</button>${AUSW_OPEN?guetePanel()+fahrtenPanel()+korrPanel():""}`;
+  if(MAP.trackData){const t=MAP.trackData; if(t.fehler)h+=`<div class="msg">${esc(t.fehler)}</div>`; else{
+    h+=`<div class="sub">${t.punkte.length} Abschnitte, ${t.ohne_mast.length} Masten ohne Eintrag${t.gps&&t.gps.length?`, ${t.gps.length} GPS-Punkte`:""}</div><div class="sub">${(t.gps&&t.gps.length?[...new Set(t.gps.map(q=>q[4]||"alt"))]:["browser"]).map(q=>`<span style="color:${{browser:"#7ac943",owntracks:"#3fd0d0",alt:"#9bc77f"}[q]||"#7ac943"}">━</span> ${{browser:"Browser",owntracks:"OwnTracks",alt:"GPS alt"}[q]||esc(q)}`).join(" · ")} · <span style="color:#c04bd6">╍</span> Zellortung${t.strecken&&t.strecken.length?` · <span style="color:#cfcfcf">┈</span> nachgetragen`:""}</div>`;
+    if(t.ohne_mast.length)h+=`<button data-act="omfold">${OM_OPEN?"Liste ausblenden":"Masten ohne Eintrag zeigen"}</button>`;
+    if(OM_OPEN)h+=t.ohne_mast.map(o=>`<div class="om">eNB <b>${o.enb}</b> · zuletzt ${tfmt(o.zuletzt)} · ${o.anzahl}×${o.lat!=null?"":" · Ort unbekannt"}
+      ${FP_OPEN===o.schluessel?mastForm(o.schluessel,o.lat,o.lng):`<button data-act="open" data-key="${esc(o.schluessel)}">Mast ermitteln</button>`}</div>`).join("")}}
+  // Handy-Tracking per OwnTracks: bewusst ein-/ausschalten, Server stellt die App dann auf Move bzw. Significant
+  const T=MAP.otState, L_=T&&T.letzte, mod={1:"Significant",2:"Move",0:"Manuell","-1":"Ruhig"};
+  // Konfigurationslink für OwnTracks (braucht dort „Allow external configuration“); nur Modus und Meldeabstand
+  const otLink=an=>"owntracks:///config?inline="+encodeURIComponent(btoa(JSON.stringify(an
+    ?{_type:"configuration",monitoring:2,locatorDisplacement:50,locatorInterval:15,ignoreInaccurateLocations:50}
+    :{_type:"configuration",monitoring:1,locatorDisplacement:200,locatorInterval:180})));
+  h+=`<hr><div><b>Handy-Tracking</b> <span class="sub">(OwnTracks)</span></div>`+(T?(T.an
+    ?`<button class="on" data-act="oton" data-an="0">● an seit ${tfmt(T.seit)} – ausschalten</button>`
+    :`<button class="pri" data-act="oton" data-an="1">einschalten</button>${T.grund&&T.grund.includes("automatisch")?`<div class="sub">${esc(T.grund)}</div>`:""}`)
+    +`<div class="sub">${L_?`letzte Meldung ${tfmt(L_.t)}${L_.acc!=null?` · ±${L_.acc} m`:""} · App-Modus ${mod[L_.modus]??"?"}${L_.akku!=null?` · Akku ${L_.akku} %`:""}${(T.an?2:1)!==L_.modus?` · <span style="color:#e0a040">wechselt nach ${T.an?"Move":"Significant"} bei der nächsten Meldung – Link unten antippen</span>`:""}`:"noch keine Meldung der App"}</div>`
+    +`<div><a class="btn" href="${otLink(T.an)}">OwnTracks auf ${T.an?"Move":"Significant"} stellen</a> <span class="sub">(auf dem Handy antippen)</span></div>`
+    +`<div class="sub">Nur einschalten, wenn das Handy bei der Box ist. Aus = Positionen werden verworfen. Schaltet sich nach 12 h selbst aus.</div>`:`<div class="sub">lade …</div>`);
+  h+=`<hr><div><b>Mitschreiben</b> <span class="sub">(Browser, Seite offen)</span></div>`+(REC.on
+    ?`<button class="on" data-act="recstop">● läuft – stoppen</button><div class="sub" id="recinfo"></div><div class="sub">Seite offen und Bildschirm an lassen.</div>`
+    :`<button class="pri" data-act="recstart">Handy-Standort mitschreiben</button>${REC.err?`<div class="msg">${esc(REC.err)}</div>`:""}`);
+  h+="<hr>";
+  if(!MS)h+=`<div class="sub">lade Status …</div>`;
+  else if(!MS.ok)h+=`<div class="msg">${esc(MS.fehler)}</div>`;
+  else{const z=MS.zelle;
+    h+=`<div>Aktuell eNB <b>${z.enb}</b> (${esc(z.cellid)}) · ${z.distanz_m||"?"} m zum Mast</div>`;
+    h+=MS.mast?`<div class="okm">✓ Mast bekannt${MS.mast_ebene==="sektor"?` (nur Sektor ${z.sektor})`:""}: ${MS.mast.lat}, ${MS.mast.lng}</div><div class="sub">${esc(MS.mast.quelle)} · ${esc(MS.mast.erfasst)}</div>`
+              :`<div class="msg">Mast unbekannt – nur Zellschätzung${g&&g.genauigkeit_m?" ±"+(g.genauigkeit_m/1000).toFixed(1)+" km":""}</div>`;
+    if(FP_OPEN!=="cur")h+=`<button class="pri" data-act="open" data-key="cur">${MS.mast?"Mast neu ermitteln":"Mast ermitteln"}</button>`;
+    else{
+      const b=MS.berechnet, n=MS.beobachtungen.length;
+      h+=`<div style="margin-top:.3rem"><b>Anlernen</b> <span class="sub">(Gerät im WLAN der Box)</span></div>
+        <button data-act="obs">Meinen Standort beitragen</button>${n?`<button data-act="obsdel">${n} löschen</button>`:""}
+        <div class="sub">${n} Beobachtung${n===1?"":"en"}; ab 3 an verschiedenen Stellen (≥100 m auseinander) wird der Mast berechnet.${isSecureContext?"":` Standort geht nur ${HTTPS_TXT()}.`}</div>`;
+      if(b)h+=`<div class="okm">berechnet: ${b.lat}, ${b.lng} (±${b.rms_m} m aus ${b.anzahl})</div><button class="pri" data-act="takecalc">übernehmen</button>`;
+      const s=MS.schaetzung_beacondb, m=MS.mast;
+      h+=`<div style="margin-top:.3rem"><b>Nachsehen und eintragen</b></div>`+mastForm("",(m||s||{}).lat,(m||s||{}).lng);
+      if(MS.mast)h+=`<button data-act="del">Mast aus Datenbank löschen</button>`;
+      h+=`<button data-act="close">schließen</button>`;
+    }}
+  h+=`<div class="msg" id="fpmsg"></div></div>`;
+  el.innerHTML=h;
+  el.querySelector(".fphead").onclick=()=>{FP_ZU=!FP_ZU;try{localStorage.setItem("fpZu",FP_ZU?"1":"0")}catch(e){}renderFP()};
+  // Anlern-Ringe des aktuellen Masts zeigen, solange "Mast ermitteln" offen ist
+  MAP.obs.clearLayers();
+  if(FP_OPEN==="cur"&&MS&&MS.ok){MS.beobachtungen.forEach(o=>{L.circle([o.lat,o.lng],{radius:o.distanz_m,color:"#7ac943",weight:1,fill:false,dashArray:"3 4",interactive:false}).addTo(MAP.obs);L.circleMarker([o.lat,o.lng],{radius:3,color:"#7ac943"}).addTo(MAP.obs)});
+    if(MS.berechnet)L.circleMarker([MS.berechnet.lat,MS.berechnet.lng],{radius:6,color:"#7ac943",fillOpacity:.8}).bindTooltip("berechneter Mast").addTo(MAP.obs)}
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>fpAction(b.dataset,el)); recInfo();
+  const ts=el.querySelector("#tracksel"); if(ts)ts.onchange=()=>{TRACK_Q=ts.value;TRACK_H=TRACK_Q?1:0;loadTrack()};
+  const ab=el.querySelector("#abdsel"); if(ab)ab.onchange=()=>{ABDECKUNG=ab.checked;loadAbdeckung()};
+  const fu=el.querySelector("#funksel"); if(fu)fu.onchange=()=>{L_FUNK=fu.checked;drawFunk();if(L_FUNK)loadAusw()};
+  const ge=el.querySelector("#gebsel"); if(ge)ge.onchange=()=>{L_GEB=ge.checked;drawGeb();if(L_GEB)loadAusw()};
+  el.querySelectorAll(".om button[data-s]").forEach(b=>b.onclick=()=>korrAktion(b.dataset,el.querySelector("#fpmsg")));
+}
+async function fpAction(d,el){
+  const msg=t=>{const m=el.querySelector("#fpmsg");if(m)m.textContent=t};
+  try{
+    if(d.act==="track"){TRACK_H=+d.h;return loadTrack()}
+    if(d.act==="omfold"){OM_OPEN=!OM_OPEN;return renderFP()}
+    if(d.act==="auswfold"){AUSW_OPEN=!AUSW_OPEN;if(AUSW_OPEN)loadAusw();return renderFP()}
+    if(d.act==="oton"){MAP.otState=await api("api/mast/tracking",{an:d.an==="1"});return renderFP()}
+    if(d.act==="recstart")return recStart();
+    if(d.act==="recstop")return recStop();
+    if(d.act==="open"){FP_OPEN=d.key;return renderFP()}
+    if(d.act==="close"){FP_OPEN=null;return renderFP()}
+    const done=async r=>{MS=r;FP_OPEN=null;renderFP();loadMasten();setTimeout(loadFritzGeo,4000);if(TRACK_H)loadTrack()};
+    if(d.act==="save"){const v=el.querySelector(`input[data-key="${CSS.escape(d.key)}"]`).value.match(/(-?\d+(?:[.,]\d+)?)\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)/);
+      if(!v)return msg("Koordinaten als „Breite, Länge“ eingeben, z. B. 52.5163, 13.3777");
+      const body={lat:+v[1].replace(",","."),lng:+v[2].replace(",","."),quelle:"manuell eingetragen"}; if(d.key)body.schluessel=d.key;
+      else if(el.querySelector("#fpsek")?.checked)body.sektor=true;
+      return done(await api("api/mast/setzen",body))}
+    if(d.act==="takecalc")return done(await api("api/mast/setzen",{lat:MS.berechnet.lat,lng:MS.berechnet.lng,sektor:!!el.querySelector("#fpsek")?.checked,quelle:`angelernt aus ${MS.berechnet.anzahl} Beobachtungen (±${MS.berechnet.rms_m} m)`}));
+    if(d.act==="del"){if(!confirm("Mast aus der eigenen Datenbank löschen?"))return; return done(await api("api/mast/loeschen",{}))}
+    if(d.act==="obsdel"){if(!confirm("Alle Beobachtungen für diesen Mast löschen?"))return; MS=await api("api/mast/beobachtungen-loeschen",{});return renderFP()}
+    if(d.act==="obs"){
+      if(!navigator.geolocation||!isSecureContext)return msg(`Standort ist nur ${HTTPS_TXT()} verfügbar.`);
+      msg("Standort wird ermittelt …");
+      const pos=await new Promise((ok,no)=>navigator.geolocation.getCurrentPosition(ok,no,{enableHighAccuracy:true,timeout:20000,maximumAge:0}));
+      MS=await api("api/mast/beobachtung",{lat:pos.coords.latitude,lng:pos.coords.longitude,genauigkeit_m:pos.coords.accuracy});
+      renderFP(); msg(`gespeichert (±${Math.round(pos.coords.accuracy)} m)`)}
+  }catch(e){msg(e.message||String(e))}
+}
+function fritzGeoText(){
+  const f=FGEO, g=f&&f.geo; if(!g||g.lat==null)return `<div>unterwegs, Ort unbekannt${g?" ("+g.quelle+")":""}</div>`;
+  const t=s=>new Date(s*1000).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+  const z=(f.zellen||[])[0]||{}, km=(g.genauigkeit_m/1000).toLocaleString("de-DE",{maximumFractionDigits:1});
+  const alt=!f.ok||Date.now()/1000-f.abgefragt>900;
+  if(g.mast)return `<div>am Mast eNB ${g.enb} (eigene Datenbank)</div><div>Box ca. ${z.distanz_m||"?"} m vom Mast${z.rsrp?` · ${z.rsrp} dBm`:""}</div>`+
+    `<div${alt?' class="old"':""}>${alt?"letzter bekannter Ort, ":""}Stand ${t(f.abgefragt)}</div>`;
+  return `<div>${esc(g.quelle||"Zelle")}${g.anzahl?` (${g.anzahl} Messungen)`:""}: ${g.lat.toFixed(3)}, ${g.lng.toFixed(3)} ±${km} km</div>`+
+    (g.gehalten?`<div class="old">Sprung von ${g.verworfen?.quelle||"?"} (${((g.verworfen?.sprung_m||0)/1000).toFixed(1)} km) als unplausibel verworfen</div>`:"")+
+    `<div>${z.cellid||"?"}${z.distanz_m?` · ${z.distanz_m} m zum Mast`:""}${z.rsrp?` · ${z.rsrp} dBm`:""}</div>`+
+    `<div${alt?' class="old"':""}>${alt?"letzter bekannter Ort, ":""}Stand ${t(f.abgefragt)}</div>`;
+}
+function loadLeaflet(){
+  if(window.L)return Promise.resolve();
+  return new Promise((ok,err)=>{
+    const c=document.createElement("link");c.rel="stylesheet";c.href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";document.head.appendChild(c);
+    const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";s.onload=ok;s.onerror=err;document.head.appendChild(s);
+  });
+}
+function initMap(){
+  const m=L.map("map",{scrollWheelZoom:true,wheelPxPerZoomLevel:90,zoomSnap:.25});
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(m);
+  const orte=Object.values(GEO);
+  if(orte.length>1)m.fitBounds(L.latLngBounds(orte).pad(.12)); else m.setView(orte[0]||[51.2,10.4],orte.length?9:6);
+  MAP={m,links:{},marks:{}};
+  for(const k of SITES){
+    if(!GEO[k]||!GEO.hub)continue;
+    const base=L.polyline([GEO.hub,GEO[k]],{weight:2,opacity:.5,interactive:false}).addTo(m);
+    // Punkte als Strichmuster mit runden Enden, animiert per CSS; je Richtung eine Linie
+    const fin=L.polyline([GEO[k],GEO.hub],{className:"mflow",dashArray:"0.1 18",lineCap:"round",opacity:0,interactive:false}).addTo(m);
+    const fout=L.polyline([GEO.hub,GEO[k]],{className:"mflow",dashArray:"0.1 18",lineCap:"round",opacity:0,interactive:false}).addTo(m);
+    MAP.links[k]={base,in:fin,out:fout};
+  }
+  for(const k of [...(GEO.hub?["hub"]:[]),...SITES.filter(k=>GEO[k])])addMark(k);
+  if(MOB&&!GEO[MOB]){const Mob=L.Control.extend({onAdd(){const d=L.DomUtil.create("div","mmob");d.innerHTML='<div class="mb"><div class="r1"></div><div class="r2"></div></div><div class="ml"><b>'+esc(NAME[MOB])+'</b><div class="mi">unterwegs, kein fester Standort</div></div>';return d}});
+  MAP.mob=new Mob({position:"bottomleft"}).addTo(m);}
+  if(MOB){placeFritz();addFritzPanel()}
+}
+// Kleiner Marker in Statusfarbe mit Namen; Raten und Details beim Überfahren (Touch: antippen)
+function addMark(k){
+  const html=`<div class="mb"></div><div class="ml"><b>${esc(k==="hub"?CFG.hub.name:NAME[k])}</b><div class="md"><div class="rt"><span class="r1"></span><br><span class="r2"></span></div><div class="mi"></div></div></div>`;
+  const mk=L.marker(GEO[k],{icon:L.divIcon({className:"mnode",html,iconSize:[16,16],iconAnchor:[8,8]}),keyboard:false}).addTo(MAP.m);
+  mk.on("click",()=>{const e=mk.getElement();if(e)e.classList.toggle("open")});
+  MAP.marks[k]=mk;
+}
+function drawMap(L_){
+  if(!MAP||VIEW!=="karte"||!FL)return;
+  for(const l of FL.lanes){
+    const ln=MAP.links[l.k]; if(!ln)continue;
+    const mb=l.rate*8/1e6, f=ln[l.dir], active=l.on&&mb>=0.02;
+    f.setStyle({color:l.color,weight:Math.min(12,4+l.w/2),opacity:active?.95:0});
+    const el=f.getElement(); if(el)el.style.animationDuration=(18/(25+35*Math.log10(1+mb))).toFixed(2)+"s";
+    if(l.dir==="in")ln.base.setStyle({color:l.on?NODES[l.k].c:"#666",weight:l.on?Math.max(2,l.w):2,opacity:l.on?.45:.8,dashArray:l.on?null:"6 8"});
+  }
+  const copy=(el,k)=>{const n=FL.nodes[k];if(!el||!n)return;
+    const b=el.querySelector(".mb");b.style.borderColor=n.c.getAttribute("stroke");const da=n.c.getAttribute("stroke-dasharray");b.style.borderStyle=!da||da==="none"?"solid":"dashed";
+    const h=t=>t.innerHTML.replace(/<tspan[^>]*>/g," <small style=\"color:#999;font-weight:400\">").replace(/<\/tspan>/g,"</small>");el.querySelector(".r1").innerHTML=h(n.t1);el.querySelector(".r2").innerHTML=h(n.t2);
+    if(k!==MOB)el.querySelector(".mi").innerHTML=n.info.map(t=>t.textContent?`<div>${[...t.childNodes].map(c=>c.nodeType===3?c.textContent:`<span style="color:${c.getAttribute("fill")||"inherit"}">${c.textContent}</span>`).join("")}</div>`:"").join("");
+  };
+  for(const k in MAP.marks)copy(MAP.marks[k].getElement(),k);
+  // Offloader: zusätzlich Internet-Rate, Lage und Portwächter
+  const h=MAP.marks.hub&&MAP.marks.hub.getElement(), I=FL.nodes.inet;
+  if(h)h.querySelector(".mi").innerHTML=`${CFG.hub.ort?`<div>${esc(CFG.hub.ort)}</div>`:""}<div>Internet ↓ ${I.t1.textContent.slice(2)} · ↑ ${I.t2.textContent.slice(2)}</div>`+
+    [2,3].map(i=>I.info[i]&&I.info[i].textContent?`<div>${I.info[i].innerHTML.replace(/<tspan fill="([^"]+)">/g,'<span style="color:$1">').replace(/<\/tspan>/g,"</span>")}</div>`:"").join("");
+  const F=MOB&&FL.nodes[MOB], mob=MAP.mob?MAP.mob.getContainer():MAP.marks[MOB]&&MAP.marks[MOB].getElement();
+  if(!mob||!F)return; if(MAP.mob)copy(mob,MOB);
+  mob.querySelector(".mi").innerHTML=`${fritzGeoText()}${F.info.map(t=>t.textContent?`<div>${t.textContent}</div>`:"").join("")}`;
+}
+async function setView(v){
+  VIEW=v; try{localStorage.setItem("flowView",v)}catch(e){}
+  document.querySelectorAll(".vsw button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  document.getElementById("flow").style.display=v==="schema"?"":"none";
+  document.getElementById("map").style.display=v==="karte"?"block":"none";
+  if(v==="karte"){
+    try{await loadLeaflet()}catch(e){document.getElementById("map").textContent="Karte konnte nicht geladen werden (Leaflet/OpenStreetMap nicht erreichbar).";return}
+    if(!MAP){await loadFritzGeo();initMap()} MAP.m.invalidateSize(); if(LIVE)drawMap(LIVE);
+  }
+}
+document.querySelectorAll(".vsw button").forEach(b=>b.onclick=()=>setView(b.dataset.v));
+(async()=>{
+  try{CFG=await (await fetch("config.json?t="+Date.now())).json()}
+  catch(e){document.getElementById("stand").textContent="config.json fehlt – offloader-status-einrichten ausführen";return}
+  aufbauen(); load().then(()=>live()); live(); sseStart();
+  try{if(localStorage.getItem("flowView")==="karte")setView("karte")}catch(e){}
+})();
+</script></body></html>

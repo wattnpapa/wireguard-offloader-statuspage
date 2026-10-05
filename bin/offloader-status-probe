@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+# Jede Minute: je Standort verbunden ja/nein (WireGuard-Handshake < 180 s) und Latenz/Paketverlust.
+# Messung per Ping, mit ping_tcp ersatzweise per TCP-Verbindungsaufbau (für Gegenstellen, die Ping verwerfen).
+# Schreibt probe.csv (Spaltenfolge der Standorte in probe-spalten.json) und probe.json für die Seite.
+# Dazu: öffentliche Adresse je Standort samt Anbieter und Wechseln (endpoints.json) und – falls eingerichtet –
+# der Portwächter: welche TCP-Ports des Hosts [portwaechter] von hier aus offen sind.
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.environ.get("OFFLOADER_STATUS_LIB") or _os.path.join(_os.path.dirname(_os.path.realpath(__file__)), "..", "lib"))
+import csv, json, os, re, socket, subprocess, threading, time, urllib.request
+from offloader_status import konfig
+
+K = konfig.K
+CSV = konfig.datei("probe.csv"); OUT = konfig.web("probe.json"); ENDP = konfig.datei("endpoints.json")
+WG = K["hub"]["tunnel"]
+PEERS = konfig.peers()
+SITES = konfig.STANDORTE
+TARGET = {s["schluessel"]: (s["ping"], s["ping_tcp"] or None) for s in K["standort"]}
+KEEP = K["daten"]["probe_tage"] * 86400; N = 4
+PW = K["portwaechter"]
+# RDAP liefert meist nur Kürzel, bekannte Netze auf lesbare Namen abbilden
+ANBIETER = (("DGNO|DE-DGW|Deutsche Glasfaser", "Deutsche Glasfaser"), ("DTAG|Deutsche Telekom", "Telekom"),
+            ("KABEL-DEUTSCHLAND", "Vodafone Kabel"), ("ARCOR|Vodafone", "Vodafone"), ("TELEFONICA|O2", "O2"),
+            ("1&1|VERSATEL", "1&1"))
+
+ports = None
+endp = {}
+if os.path.exists(ENDP):
+    with open(ENDP) as f: endp = json.load(f)
+
+
+def scan_loop():
+    # langsam und mit kurzer Liste, damit Einbruchserkennung auf der Gegenseite nicht anschlägt
+    global ports
+    while True:
+        found = []
+        for p in PW["ports"]:
+            try:
+                with socket.create_connection((PW["host"], p), timeout=1.5): found.append(p)
+            except OSError: pass
+            time.sleep(0.3)
+        exp = PW["erwartet"]
+        ports = {"ts": int(time.time()), "host": PW["host"], "open": found, "expected": exp,
+                 "unexpected": [p for p in found if p not in exp], "missing": [p for p in exp if p not in found]}
+        time.sleep(PW["intervall_s"])
+
+
+def provider(ip):
+    try:
+        j = json.load(urllib.request.urlopen(f"https://rdap.db.ripe.net/ip/{ip}", timeout=8))
+        rem = [d for x in j.get("remarks", []) for d in x.get("description", [])]
+        txt = " ".join([j.get("name") or ""] + rem + [v[3] for e in j.get("entities", [])
+                                                      for v in e.get("vcardArray", [None, []])[1] if v[0] == "fn"])
+        for pat, name in ANBIETER:
+            if re.search(pat, txt, re.I): return name
+        return rem[0] if rem else j.get("name")
+    except Exception: return None
+
+
+def wg_dump():
+    for line in subprocess.check_output(["wg", "show", WG, "dump"], text=True).splitlines()[1:]:
+        f = line.split("\t")
+        k = next((PEERS[a] for a in f[3].split(",") if a in PEERS), None)
+        if k: yield k, f
+
+
+def track_endpoints():
+    changed = False
+    for k, f in wg_dump():
+        if f[2] == "(none)": continue
+        ip = f[2].rsplit(":", 1)[0].strip("[]"); e = endp.get(k)
+        if e and e["ip"] == ip: continue
+        n = {"ip": ip, "since": int(time.time()), "provider": provider(ip), "changes": (e or {}).get("changes", [])}
+        if e: n["changes"] = (n["changes"] + [[n["since"], e["ip"]]])[-20:]
+        else: n["since"] = None   # erster Eintrag: seit wann die Adresse gilt, ist unbekannt
+        endp[k] = n; changed = True
+    if changed:
+        with open(ENDP + ".tmp", "w") as f: json.dump(endp, f)
+        os.replace(ENDP + ".tmp", ENDP)
+
+
+def streak(rows, c):
+    # aktueller Zustand und seit wann; exact=False, wenn der Zustand schon beim ersten Messpunkt bzw. vor einer Messlücke galt
+    last = None; since = None; prev = None
+    for r in reversed(rows):
+        if r[c] is None: break
+        if last is None: last = r[c]
+        if r[c] != last: return {"up": last, "since": since, "exact": True}
+        if prev is not None and prev - r[0] > 180: return {"up": last, "since": since, "exact": False}
+        since = prev = r[0]
+    return {"up": last, "since": since, "exact": False}
+
+
+def ping(host):
+    o = subprocess.run(["ping", "-c", str(N), "-i", "0.3", "-W", "1", "-q", host], capture_output=True, text=True).stdout
+    loss = re.search(r"([\d.]+)% packet loss", o); rtt = re.search(r"= [\d.]+/([\d.]+)/", o)
+    return (float(rtt.group(1)) if rtt else None, float(loss.group(1)) if loss else 100.0)
+
+
+def tcp(host, port):
+    ok = []
+    for _ in range(N):
+        t = time.monotonic()
+        try:
+            with socket.create_connection((host, port), timeout=1): ok.append((time.monotonic() - t) * 1000)
+        except OSError: pass
+        time.sleep(0.2)
+    return (sum(ok) / len(ok) if ok else None, 100.0 * (N - len(ok)) / N)
+
+
+def measure(k, up):
+    if not up: return None, None, ""
+    host, port = TARGET[k]; rtt, loss = ping(host); how = "icmp"
+    if rtt is None and port: rtt, loss = tcp(host, port); how = f"tcp/{port}"
+    return rtt, loss, how
+
+
+def build(rows, how, spalten):
+    now = int(time.time())
+    out = {"ts": now, "since": rows[0][0] if rows else now, "how": how, "lat": {"ts": []}, "days": {}, "outages": {},
+           "uptime30": {}, "state": {}, "cur": {}}
+    lat = [r for r in rows if r[0] > now - 48 * 3600]; out["lat"]["ts"] = [r[0] for r in lat]
+    for k in SITES:
+        c = 1 + 3 * spalten.index(k)
+        out["lat"][k] = {"rtt": [r[c + 1] for r in lat], "loss": [r[c + 2] for r in lat]}
+        days = {}; outs = []; cur = None; prev = None; u30 = [0, 0]
+        for r in rows:
+            if r[0] < now - 30 * 86400 or r[c] is None: continue
+            d = time.strftime("%Y-%m-%d", time.localtime(r[0])); x = days.setdefault(d, [0, 0])
+            x[1] += 1; x[0] += r[c]; u30[1] += 1; u30[0] += r[c]
+            gap = prev is not None and r[0] - prev > 180
+            if cur and (r[c] or gap): outs.append([cur, prev if gap else r[0]]); cur = None
+            if not r[c] and cur is None: cur = r[0]
+            prev = r[0]
+        if cur: outs.append([cur, None])
+        out["days"][k] = [[d, round(100 * v[0] / v[1], 2)] for d, v in sorted(days.items())]
+        out["outages"][k] = outs[-50:]
+        out["uptime30"][k] = round(100 * u30[0] / u30[1], 3) if u30[1] else None
+        out["state"][k] = streak(rows, c)
+        out["cur"][k] = {"rtt": rows[-1][c + 1], "loss": rows[-1][c + 2]} if rows else None
+    out["ports"] = ports; out["endp"] = {k: v for k, v in endp.items() if k in SITES}
+    with open(OUT + ".tmp", "w") as f: json.dump(out, f)
+    os.replace(OUT + ".tmp", OUT)
+
+
+def load(breite):
+    rows = []
+    if os.path.exists(CSV):
+        with open(CSV) as f:
+            for r in csv.reader(f):
+                row = [int(r[0])] + [None if x == "" else float(x) if "." in x else int(x) for x in r[1:]]
+                rows.append(row + [None] * (breite - len(row)))
+    return rows
+
+
+def main():
+    spalten = konfig.spalten(konfig.datei("probe-spalten.json"), SITES)
+    breite = 1 + 3 * len(spalten)
+    rows = load(breite); cut = time.time() - KEEP; rows = [r for r in rows if r[0] >= cut]
+    with open(CSV, "w") as f: csv.writer(f).writerows([["" if x is None else x for x in r] for r in rows])
+    how = {}; n = 0
+    if PW["host"]:
+        threading.Thread(target=scan_loop, daemon=True).start()
+    while True:
+        t = int(time.time()) // 60 * 60
+        try:
+            hs = {k: int(f[4]) for k, f in wg_dump()}
+            try: track_endpoints()
+            except Exception as e: print("Endpunkte:", e, flush=True)
+            row = [t] + [""] * (breite - 1)
+            for k in SITES:
+                c = 1 + 3 * spalten.index(k)
+                up = int(hs.get(k, 0) > 0 and time.time() - hs[k] < 180)
+                rtt, loss, h = measure(k, up)
+                row[c:c + 3] = [up, "" if rtt is None else round(rtt, 2), "" if loss is None else loss]
+                if h: how[k] = h
+            with open(CSV, "a") as f: csv.writer(f).writerow(row)
+            rows.append([row[0]] + [None if x == "" else x for x in row[1:]])
+            n += 1
+            if n % 1440 == 0: rows = [r for r in rows if r[0] >= time.time() - KEEP]
+            build(rows, how, spalten)
+        except Exception as e: print("Fehler:", e, flush=True)
+        time.sleep(max(5, 60 - (time.time() - t)))
+
+
+if __name__ == "__main__":
+    main()
