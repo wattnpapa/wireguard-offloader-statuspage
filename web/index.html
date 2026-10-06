@@ -39,7 +39,7 @@ canvas{max-height:260px}
 .fp button.on{background:#c04bd6;border-color:#c04bd6;color:#fff}.fp button.pri{border-color:#c04bd6;color:#e9b6f3}
 .fp input{background:#111;color:#ddd;border:1px solid #444;border-radius:5px;padding:.15rem .4rem;font-size:11px;width:135px}
 .fp a{color:#9ec5ff}.fp a.btn{display:inline-block;background:#222;border:1px solid #c04bd6;color:#e9b6f3;border-radius:5px;padding:.15rem .5rem;font-size:11px;text-decoration:none;margin:.15rem 0}.fp .msg{color:#e0a040;margin-top:.2rem}.fp .okm{color:#7ac943}.fp .om{border-top:1px dotted #333;padding:.3rem 0}.fp table.gt{border-collapse:collapse;font-size:10.5px;margin:.2rem 0;width:100%}.fp table.gt td,.fp table.gt th{padding:1px 3px;text-align:right;border-bottom:1px solid #2a2a2a}.fp table.gt th{color:#999;font-weight:normal}.fp table.gt td:first-child,.fp table.gt th:first-child{text-align:left}
-.mmast{background:none;border:0}.mmast svg{display:block;filter:drop-shadow(0 0 1.5px rgba(0,0,0,.9))}.mmast.vor{opacity:.9;cursor:pointer}
+.mmast{background:none;border:0}.mmast svg{display:block;filter:drop-shadow(0 0 1.5px rgba(0,0,0,.9))}.mmast.vor{opacity:.9;cursor:pointer}.mlinie{stroke-dasharray:7 6;animation:mlauf .7s linear infinite;pointer-events:none}@keyframes mlauf{to{stroke-dashoffset:-13}}
 #map.full{position:fixed!important;inset:0;width:100vw;height:100vh;height:100dvh!important;z-index:5000;border-radius:0;margin:0}
 .fp .fphead{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:.5rem}.fp.zu .fpbody{display:none}.fp.zu{width:auto}
 .fp .fphead small{color:#888;font-weight:400}
@@ -629,13 +629,18 @@ function drawFunk(){
   for(const a of AUSW.abbrueche)L.circleMarker([a.lat,a.lng],{radius:5,color:"#fff",weight:1,fillColor:"#000",fillOpacity:1})
     .bindTooltip(`<b>Abbruch</b> ${tfmt(a.t)}<br>Box antwortete ${a.dauer_s?"ca. "+Math.max(1,Math.round(a.dauer_s/60))+" min":"kurz"} nicht`).addTo(MAP.funk);
 }
+// beim Überfahren: animierte Linie von der Zelle bzw. dem Messpunkt zum Mast (Striche laufen zum Mast)
+function mastLinie(lay,von,mast,farbe){if(!mast)return;const ziel=Array.isArray(mast)?mast:[mast.lat,mast.lng];let l=null;
+  lay.on("mouseover",()=>{if(!l)l=L.polyline([von,ziel],{color:farbe,weight:2.5,opacity:.95,className:"mlinie",interactive:false}).addTo(MAP.m)})
+     .on("mouseout remove",()=>{if(l){l.remove();l=null}})}
 const GEB_F=k=>{let h=0;for(const c of k)h=(h*31+c.charCodeAt(0))%360;return `hsl(${h},70%,55%)`};
 function drawGeb(){
   if(!MAP.geb)MAP.geb=L.layerGroup(); MAP.geb.clearLayers();
   if(!L_GEB||!AUSW||AUSW.fehler){MAP.geb.remove();return} MAP.geb.addTo(MAP.m);
   for(const g of AUSW.gebiete){const [pl,enb,sek]=g.schluessel.split(":"),f=GEB_F(g.schluessel);
-    (g.huelle.length>2?L.polygon(g.huelle,{color:f,weight:1.5,fillColor:f,fillOpacity:.12}):L.circleMarker([g.lat,g.lng],{radius:4,color:f}))
-      .bindTooltip(`<b>eNB ${enb} · Sektor ${sek}</b><br>hier verbunden an ${g.n} Messpunkten${g.mast_art?`<br>reicht bis zum Mast (${g.mast_art==="bekannt"?"bestätigt":"berechnet, noch nicht bestätigt"})`:""}`,{sticky:true}).addTo(MAP.geb)}
+    const gl=(g.huelle.length>2?L.polygon(g.huelle,{color:f,weight:1.5,fillColor:f,fillOpacity:.12}):L.circleMarker([g.lat,g.lng],{radius:4,color:f}));
+    mastLinie(gl,[g.lat,g.lng],g.mast,f);
+    gl.bindTooltip(`<b>eNB ${enb} · Sektor ${sek}</b><br>hier verbunden an ${g.n} Messpunkten${g.mast_art?`<br>reicht bis zum Mast (${g.mast_art==="bekannt"?"bestätigt":"berechnet, noch nicht bestätigt"})`:""}`,{sticky:true}).addTo(MAP.geb)}
   for(const w of AUSW.wechsel){const v=w.von.split(":"),n=w.nach.split(":");
     L.circleMarker([w.lat,w.lng],{radius:w.pingpong?4:3,color:w.pingpong?"#ff4136":"#fff",weight:1,fillColor:w.pingpong?"#ff4136":"#888",fillOpacity:.9})
       .bindTooltip(`<b>Zellwechsel</b> ${tfmt(w.t)}<br>eNB ${v[1]}/${v[2]} → ${n[1]}/${n[2]}${w.pingpong?"<br><span style='color:#ff4136'>Ping-Pong: innerhalb 2 min zurück</span>":""}`).addTo(MAP.geb)}
@@ -708,8 +713,9 @@ async function loadTrack(still){
   pts.forEach((p,i)=>{const last=i===pts.length-1;
     // orange = damals berechneter Ort der Box; lila nur, wenn keiner gespeichert ist und ersatzweise der Mast steht
     const ersatz=p.quelle==="mast", acc=p.genauigkeit_m||0;
-    L.circleMarker([p.lat,p.lng],{radius:last?7:5,color:ersatz?"#c04bd6":"#e0a040",weight:2,fillColor:ersatz?"#c04bd6":"#161616",fillOpacity:ersatz?.9:.6})
-     .bindTooltip(`<b>${tfmt(p.von)}${p.bis>p.von?" – "+tfmt(p.bis):""}</b><br>eNB ${p.enb} (${esc(p.cellid)})${p.distanz_m?" · "+p.distanz_m+" m zum Mast":""}<br>${ersatz?"kein berechneter Ort gespeichert, Mast aus eigener Datenbank":`berechnet: ${esc(p.ort||"Zellschätzung")} ±${acc<1000?acc+" m":(acc/1000).toFixed(1).replace(".",",")+" km"}${p.mast?" · Mast bekannt":""}`}`).addTo(MAP.track)});
+    const tp=L.circleMarker([p.lat,p.lng],{radius:last?7:5,color:ersatz?"#c04bd6":"#e0a040",weight:2,fillColor:ersatz?"#c04bd6":"#161616",fillOpacity:ersatz?.9:.6});
+    if(!ersatz)mastLinie(tp,[p.lat,p.lng],p.mast,"#e0a040");
+    tp.bindTooltip(`<b>${tfmt(p.von)}${p.bis>p.von?" – "+tfmt(p.bis):""}</b><br>eNB ${p.enb} (${esc(p.cellid)})${p.distanz_m?" · "+p.distanz_m+" m zum Mast":""}<br>${ersatz?"kein berechneter Ort gespeichert, Mast aus eigener Datenbank":`berechnet: ${esc(p.ort||"Zellschätzung")} ±${acc<1000?acc+" m":(acc/1000).toFixed(1).replace(".",",")+" km"}${p.mast?" · Mast bekannt":""}`}`).addTo(MAP.track)});
   const all=pts.map(p=>[p.lat,p.lng]).concat((d.gps||[]).map(q=>[q[1],q[2]]),...(d.strecken||[]).map(s=>s.punkte));
   if(all.length&&!still&&!FOLGEN)MAP.m.fitBounds(L.latLngBounds(all).pad(.15),{maxZoom:13});
   renderFP();
