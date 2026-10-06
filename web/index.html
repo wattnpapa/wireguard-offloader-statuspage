@@ -39,7 +39,7 @@ canvas{max-height:260px}
 .fp button.on{background:#c04bd6;border-color:#c04bd6;color:#fff}.fp button.pri{border-color:#c04bd6;color:#e9b6f3}
 .fp input{background:#111;color:#ddd;border:1px solid #444;border-radius:5px;padding:.15rem .4rem;font-size:11px;width:135px}
 .fp a{color:#9ec5ff}.fp a.btn{display:inline-block;background:#222;border:1px solid #c04bd6;color:#e9b6f3;border-radius:5px;padding:.15rem .5rem;font-size:11px;text-decoration:none;margin:.15rem 0}.fp .msg{color:#e0a040;margin-top:.2rem}.fp .okm{color:#7ac943}.fp .om{border-top:1px dotted #333;padding:.3rem 0}.fp table.gt{border-collapse:collapse;font-size:10.5px;margin:.2rem 0;width:100%}.fp table.gt td,.fp table.gt th{padding:1px 3px;text-align:right;border-bottom:1px solid #2a2a2a}.fp table.gt th{color:#999;font-weight:normal}.fp table.gt td:first-child,.fp table.gt th:first-child{text-align:left}
-.mmast{background:none;border:0}.mmast svg{display:block;filter:drop-shadow(0 0 2px #000)}.mmast.vor{opacity:.75;cursor:pointer}
+.mmast{background:none;border:0}.mmast svg{display:block;filter:drop-shadow(0 0 1.5px rgba(0,0,0,.9))}.mmast.vor{opacity:.9;cursor:pointer}
 #map.full{position:fixed!important;inset:0;width:100vw;height:100vh;height:100dvh!important;z-index:5000;border-radius:0;margin:0}
 .fp .fphead{display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:.5rem}.fp.zu .fpbody{display:none}.fp.zu{width:auto}
 .fp .fphead small{color:#888;font-weight:400}
@@ -578,19 +578,19 @@ function addFritzPanel(){
   renderFP(); loadMast(); loadMasten(); loadOT(); loadAbschnitte(); setInterval(loadAbschnitte,300000); loadAusw(); setInterval(loadAusw,300000); setInterval(()=>{if(!sseFresh())loadOT()},30000);
 }
 // Bekannte Masten aus der eigenen Datenbank als kleines Antennen-Symbol (Sektor-Einträge mit grüner Spitze)
-const MAST_SVG=(c,s="#ddd")=>`<svg width="12" height="16" viewBox="0 0 12 16"><path d="M6 3 L2.5 15 M6 3 L9.5 15 M3.6 11 H8.4 M4.4 7.5 H7.6" stroke="${s}" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="6" cy="2.4" r="1.9" fill="${c}"/></svg>`;
+const MAST_SVG=(c,s="#f4f4f4")=>{const d="M8 4.5 L3.5 20 M8 4.5 L12.5 20 M4.7 15.5 H11.3 M5.7 10.5 H10.3";return `<svg width="16" height="21" viewBox="0 0 16 21"><path d="${d}" stroke="#000" stroke-opacity=".85" stroke-width="3.6" fill="none" stroke-linecap="round"/><path d="${d}" stroke="${s}" stroke-width="1.6" fill="none" stroke-linecap="round"/><circle cx="8" cy="3.4" r="3" fill="${c}" stroke="#000" stroke-width="1.2"/></svg>`};
 async function loadMasten(){
   let m; try{m=await api("api/mast/masten")}catch(e){return}
   MAP.masten.clearLayers(); MAST_DB=m;
   for(const [k,v] of Object.entries(m)){const [pl,enb,sek]=k.split(":");
-    L.marker([v.lat,v.lng],{icon:L.divIcon({className:"mmast",html:MAST_SVG(sek?"#7ac943":"#e0a040"),iconSize:[12,16],iconAnchor:[6,15]}),keyboard:false,zIndexOffset:-500})
+    L.marker([v.lat,v.lng],{icon:L.divIcon({className:"mmast",html:MAST_SVG(sek?"#a8ff3e":"#ffb347"),iconSize:[16,21],iconAnchor:[8,20]}),keyboard:false,zIndexOffset:-500})
      .bindTooltip(`<b>Mast eNB ${enb}${sek?` · Sektor ${sek}`:""}</b> <span style="color:#999">(${pl})</span>${v.notiz?`<br>${esc(v.notiz)}`:""}<br><span style="color:#999">${esc(v.quelle)} · ${esc(v.erfasst)}</span>`).addTo(MAP.masten)}
   // Vorschläge aus den Messpaaren (Handy-GPS + Abstand): grau, Klick zum Übernehmen oder Verwerfen
   let vs=[]; try{vs=await api("api/mast/vorschlaege")}catch(e){}
   MAST_VOR=vs; drawLinks();
   for(const v of vs){const [pl,enb,sek]=v.schluessel.split(":");
     const txt=`<b>Vorschlag: Mast eNB ${enb}${sek?` · Sektor ${sek}`:""}</b><br>berechnet aus ${v.anzahl} Messungen, Restfehler ±${v.rms_m} m${v.eindeutig?"":`<br><span style="color:#c60">mehrdeutig: Messpunkte fast auf einer Linie, Mast kann auch gespiegelt auf der anderen Straßenseite stehen</span>`}`;
-    const mk=L.marker([v.lat,v.lng],{icon:L.divIcon({className:"mmast vor",html:MAST_SVG(v.eindeutig?"#bbb":"#c60","#999"),iconSize:[12,16],iconAnchor:[6,15]}),keyboard:false,zIndexOffset:-600}).bindTooltip(txt+"<br><i>Klick: übernehmen oder verwerfen</i>").addTo(MAP.masten);
+    const mk=L.marker([v.lat,v.lng],{icon:L.divIcon({className:"mmast vor",html:MAST_SVG(v.eindeutig?"#ddd":"#ff7a1a","#bbb"),iconSize:[16,21],iconAnchor:[8,20]}),keyboard:false,zIndexOffset:-600}).bindTooltip(txt+"<br><i>Klick: übernehmen oder verwerfen</i>").addTo(MAP.masten);
     const box=L.DomUtil.create("div","vpop"); box.innerHTML=txt+`<br><button data-a="ok">übernehmen</button><button data-a="no">verwerfen</button><div class="m"></div>`;
     box.querySelectorAll("button").forEach(b=>b.onclick=async()=>{try{
       if(b.dataset.a==="ok")await api("api/mast/setzen",{schluessel:v.schluessel,lat:v.lat,lng:v.lng,quelle:`angelernt aus ${v.anzahl} Messfahrt-Punkten (±${v.rms_m} m${v.eindeutig?"":", mehrdeutig"})`});
@@ -647,7 +647,7 @@ function drawKorr(){
   for(const k of AUSW.masten.filter(x=>x.vorschlag)){const [pl,enb,sek]=k.schluessel.split(":");
     L.polyline([[k.alt.lat,k.alt.lng],[k.neu.lat,k.neu.lng]],{color:"#e0a040",weight:1.5,dashArray:"3 4",interactive:false}).addTo(MAP.korr);
     const txt=korrText(k);
-    const mk=L.marker([k.neu.lat,k.neu.lng],{icon:L.divIcon({className:"mmast vor",html:MAST_SVG("#e0a040","#e0a040"),iconSize:[12,16],iconAnchor:[6,15]}),keyboard:false,zIndexOffset:-550}).bindTooltip(txt+"<br><i>Klick: übernehmen oder verwerfen</i>").addTo(MAP.korr);
+    const mk=L.marker([k.neu.lat,k.neu.lng],{icon:L.divIcon({className:"mmast vor",html:MAST_SVG("#ffb347","#ffb347"),iconSize:[16,21],iconAnchor:[8,20]}),keyboard:false,zIndexOffset:-550}).bindTooltip(txt+"<br><i>Klick: übernehmen oder verwerfen</i>").addTo(MAP.korr);
     const box=L.DomUtil.create("div","vpop"); box.innerHTML=txt+korrBtns(k.schluessel)+`<div class="m"></div>`;
     box.querySelectorAll("button").forEach(b=>b.onclick=()=>korrAktion(b.dataset,box.querySelector(".m"))); mk.bindPopup(box)}
 }
