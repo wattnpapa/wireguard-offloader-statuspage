@@ -635,7 +635,7 @@ function drawGeb(){
   if(!L_GEB||!AUSW||AUSW.fehler){MAP.geb.remove();return} MAP.geb.addTo(MAP.m);
   for(const g of AUSW.gebiete){const [pl,enb,sek]=g.schluessel.split(":"),f=GEB_F(g.schluessel);
     (g.huelle.length>2?L.polygon(g.huelle,{color:f,weight:1.5,fillColor:f,fillOpacity:.12}):L.circleMarker([g.lat,g.lng],{radius:4,color:f}))
-      .bindTooltip(`<b>eNB ${enb} · Sektor ${sek}</b><br>hier verbunden an ${g.n} Messpunkten`,{sticky:true}).addTo(MAP.geb)}
+      .bindTooltip(`<b>eNB ${enb} · Sektor ${sek}</b><br>hier verbunden an ${g.n} Messpunkten${g.mast_art?`<br>reicht bis zum Mast (${g.mast_art==="bekannt"?"bestätigt":"berechnet, noch nicht bestätigt"})`:""}`,{sticky:true}).addTo(MAP.geb)}
   for(const w of AUSW.wechsel){const v=w.von.split(":"),n=w.nach.split(":");
     L.circleMarker([w.lat,w.lng],{radius:w.pingpong?4:3,color:w.pingpong?"#ff4136":"#fff",weight:1,fillColor:w.pingpong?"#ff4136":"#888",fillOpacity:.9})
       .bindTooltip(`<b>Zellwechsel</b> ${tfmt(w.t)}<br>eNB ${v[1]}/${v[2]} → ${n[1]}/${n[2]}${w.pingpong?"<br><span style='color:#ff4136'>Ping-Pong: innerhalb 2 min zurück</span>":""}`).addTo(MAP.geb)}
