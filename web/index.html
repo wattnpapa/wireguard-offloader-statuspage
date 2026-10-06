@@ -706,8 +706,10 @@ async function loadTrack(still){
   (d.strecken||[]).forEach(s=>{if(s.punkte.length>1)L.polyline(s.punkte,{color:"#cfcfcf",weight:3,opacity:.75,dashArray:"2 6"}).bindTooltip(`<b>${esc(s.name)}</b><br>${esc(s.quelle)}`).addTo(MAP.track)});
   if(pts.length>1)L.polyline(pts.map(p=>[p.lat,p.lng]),{color:"#c04bd6",weight:3,opacity:.7,dashArray:"6 6",interactive:false}).addTo(MAP.track);
   pts.forEach((p,i)=>{const last=i===pts.length-1;
-    L.circleMarker([p.lat,p.lng],{radius:last?7:5,color:p.quelle==="mast"?"#c04bd6":"#e0a040",weight:2,fillColor:p.quelle==="mast"?"#c04bd6":"#161616",fillOpacity:p.quelle==="mast"?.9:.6})
-     .bindTooltip(`<b>${tfmt(p.von)}${p.bis>p.von?" – "+tfmt(p.bis):""}</b><br>eNB ${p.enb} (${esc(p.cellid)})${p.distanz_m?" · "+p.distanz_m+" m zum Mast":""}<br>${p.quelle==="mast"?"Mast aus eigener Datenbank":"nur Zellschätzung ±"+((p.genauigkeit_m||0)/1000).toFixed(1)+" km"}`).addTo(MAP.track)});
+    // orange = damals berechneter Ort der Box; lila nur, wenn keiner gespeichert ist und ersatzweise der Mast steht
+    const ersatz=p.quelle==="mast", acc=p.genauigkeit_m||0;
+    L.circleMarker([p.lat,p.lng],{radius:last?7:5,color:ersatz?"#c04bd6":"#e0a040",weight:2,fillColor:ersatz?"#c04bd6":"#161616",fillOpacity:ersatz?.9:.6})
+     .bindTooltip(`<b>${tfmt(p.von)}${p.bis>p.von?" – "+tfmt(p.bis):""}</b><br>eNB ${p.enb} (${esc(p.cellid)})${p.distanz_m?" · "+p.distanz_m+" m zum Mast":""}<br>${ersatz?"kein berechneter Ort gespeichert, Mast aus eigener Datenbank":`berechnet: ${esc(p.ort||"Zellschätzung")} ±${acc<1000?acc+" m":(acc/1000).toFixed(1).replace(".",",")+" km"}${p.mast?" · Mast bekannt":""}`}`).addTo(MAP.track)});
   const all=pts.map(p=>[p.lat,p.lng]).concat((d.gps||[]).map(q=>[q[1],q[2]]),...(d.strecken||[]).map(s=>s.punkte));
   if(all.length&&!still&&!FOLGEN)MAP.m.fitBounds(L.latLngBounds(all).pad(.15),{maxZoom:13});
   renderFP();
