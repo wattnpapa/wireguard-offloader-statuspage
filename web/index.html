@@ -574,7 +574,7 @@ function addFritzPanel(){
     d.querySelector("#fullbtn").onclick=()=>fullToggle();d.querySelector("#mebtn").onclick=meToggle;return d}});
   new B({position:"topleft"}).addTo(MAP.m);
   MAP.m.on("dragstart",()=>{if(FOLGEN){FOLGEN=false;meBtn()}});
-  MAP.track=L.layerGroup().addTo(MAP.m); MAP.obs=L.layerGroup().addTo(MAP.m); MAP.masten=L.layerGroup().addTo(MAP.m);
+  MAP.track=L.layerGroup().addTo(MAP.m); MAP.verf=L.layerGroup().addTo(MAP.m); MAP.obs=L.layerGroup().addTo(MAP.m); MAP.masten=L.layerGroup().addTo(MAP.m);
   renderFP(); loadMast(); loadMasten(); loadOT(); loadAbschnitte(); setInterval(loadAbschnitte,300000); loadAusw(); setInterval(loadAusw,300000); setInterval(()=>{if(!sseFresh())loadOT()},30000);
 }
 // Bekannte Masten aus der eigenen Datenbank als kleines Antennen-Symbol (Sektor-Einträge mit grüner Spitze)
@@ -616,6 +616,28 @@ async function loadAbdeckung(){
 }
 // ---- Auswertungen (API /api/mast/auswertung): Ortungsgüte, Funklöcher/Latenz, Versorgungsgebiete, Masten nachschärfen ----
 let AUSW=null, L_FUNK=false, L_GEB=false, AUSW_OPEN=false;
+// Ortungsverfahren im Vergleich (API /api/mast/verfahren): je Verfahren eigene Farbe, Auswahl bleibt im Browser
+const VF={angezeigt:"#c04bd6",schwerpunkt:"#ffd400",ring:"#ff7a1a",fingerabdruck:"#2f8cff",mast:"#ff4f9a",sektoren:"#b0b0b0",frei:"#a1887f"};
+const VN={angezeigt:"angezeigt",schwerpunkt:"Zellschwerpunkt",ring:"Ring um den Mast",fingerabdruck:"Fingerabdruck",mast:"Mast",sektoren:"andere Sektoren",frei:"BeaconDB/OpenCelliD"};
+let VERF=null, VERF_AN=(()=>{try{return new Set(JSON.parse(localStorage.getItem("mb_verf")||'["fingerabdruck","ring"]'))}catch(e){return new Set(["fingerabdruck","ring"])}})();
+const kmf=e=>e==null?"–":e<1000?e+" m":(e/1000).toFixed(1).replace(".",",")+" km";
+function drawVerf(){
+  if(!MAP.verf)return; MAP.verf.clearLayers(); if(!VERF||VERF.fehler)return;
+  for(const n of VERF.namen){if(n==="angezeigt"||!VERF_AN.has(n))continue; const c=VF[n]||"#fff", pk=VERF.punkte.filter(p=>p.v[n]);
+    if(pk.length>1)L.polyline(pk.map(p=>p.v[n].slice(0,2)),{color:c,weight:2,opacity:.75,interactive:false}).addTo(MAP.verf);
+    for(const p of pk){const [la,ln,acc,e]=p.v[n];
+      L.circleMarker([la,ln],{radius:3.5,color:c,weight:1.5,fillColor:"#111",fillOpacity:.8})
+       .bindTooltip(`<b>${tfmt(p.t)}</b> · ${VN[n]||n}<br>±${kmf(acc)}${e!=null?` · <b>${kmf(e)}</b> neben GPS`:""}`).addTo(MAP.verf);
+      if(p.gps&&e!=null&&e>300)L.polyline([p.gps,[la,ln]],{color:c,weight:1,opacity:.3,dashArray:"2 4",interactive:false}).addTo(MAP.verf)}}
+}
+function verfPanel(){
+  if(!VERF)return ""; if(VERF.fehler)return `<div class="msg">${esc(VERF.fehler)}</div>`;
+  const g=VERF.guete||{}, ns=VERF.namen.slice().sort((a,b)=>((g[a]||{}).median??1e9)-((g[b]||{}).median??1e9));
+  return `<div class="sub" style="margin-top:.35rem"><b>Ortungsverfahren</b> (Abstand zum Handy-GPS)</div>`+ns.map(n=>{const q=g[n]||{};
+    return `<div class="sub"><label><input type="checkbox" data-verf="${n}" style="width:auto"${n==="angezeigt"||VERF_AN.has(n)?" checked":""}${n==="angezeigt"?" disabled":""}> <span style="color:${VF[n]||"#fff"}">━</span> ${VN[n]||n}</label>
+      <span style="float:right;color:#aaa">${q.n?`${kmf(q.median)} · p90 ${kmf(q.p90)} · ${q.n}×`:"kein GPS"}</span></div>`}).join("")
+    +(VERF.fingerabdruck_nachgerechnet?`<div class="sub" style="color:#888">Fingerabdruck für ältere Abfragen nachgerechnet (nur aus Messungen ≥ 10 min davor)</div>`:"");
+}
 async function loadAusw(){try{AUSW=await api("api/mast/auswertung")}catch(e){AUSW={fehler:e.message}} drawFunk();drawGeb();drawKorr();renderFP()}
 const RTT_F=r=>r<60?"#2ecc40":r<120?"#9be15d":r<250?"#ffdc00":r<500?"#ff851b":"#ff4136";
 function drawFunk(){
@@ -697,10 +719,11 @@ function korrPanel(){
 }
 async function loadMast(){try{MS=await api("api/mast")}catch(e){MS={ok:false,fehler:e.message}} renderFP()}
 async function loadTrack(still){
-  if(!TRACK_H){MAP.track.clearLayers();MAP.trackData=null;renderFP();return}
+  if(!TRACK_H){MAP.track.clearLayers();MAP.trackData=null;VERF=null;drawVerf();renderFP();return}
   let d; try{d=await api("api/mast/verlauf?"+TRACK_Q)}catch(e){MAP.trackData={fehler:e.message};renderFP();return}
   MAP.track.clearLayers(); if(still&&MAP.live&&REC.on)MAP.live.setLatLngs([]);
   MAP.trackData=d; const pts=d.punkte.filter(p=>p.lat!=null);
+  api("api/mast/verfahren?"+TRACK_Q).then(v=>{VERF=v;drawVerf();renderFP()}).catch(e=>{VERF={fehler:"Ortungsverfahren: "+e.message};renderFP()});
   // Handy-GPS (Wahrheit) als grüne Linie, bei Lücken > 5 min getrennt
   // je Quelle eigene Farbe; neue Linie bei Lücke > 5 min oder Quellenwechsel
   const QF={browser:"#7ac943",owntracks:"#3fd0d0",alt:"#9bc77f"}, QN={browser:"Browser-Mitschreiben",owntracks:"OwnTracks",alt:"ohne Quellenangabe"};
@@ -743,6 +766,7 @@ function renderFP(){
   <button data-act="auswfold">${AUSW_OPEN?"Auswertung ausblenden":"Ortungsgüte &amp; Masten nachschärfen"}${AUSW&&!AUSW.fehler&&AUSW.masten.some(x=>x.vorschlag)?" ●":""}</button>${AUSW_OPEN?guetePanel()+fahrtenPanel()+korrPanel():""}`;
   if(MAP.trackData){const t=MAP.trackData; if(t.fehler)h+=`<div class="msg">${esc(t.fehler)}</div>`; else{
     h+=`<div class="sub">${t.punkte.length} Abschnitte, ${t.ohne_mast.length} Masten ohne Eintrag${t.gps&&t.gps.length?`, ${t.gps.length} GPS-Punkte`:""}</div><div class="sub">${(t.gps&&t.gps.length?[...new Set(t.gps.map(q=>q[4]||"alt"))]:["browser"]).map(q=>`<span style="color:${{browser:"#7ac943",owntracks:"#3fd0d0",alt:"#9bc77f"}[q]||"#7ac943"}">━</span> ${{browser:"Browser",owntracks:"OwnTracks",alt:"GPS alt"}[q]||esc(q)}`).join(" · ")} · <span style="color:#c04bd6">╍</span> Zellortung${t.strecken&&t.strecken.length?` · <span style="color:#cfcfcf">┈</span> nachgetragen`:""}</div>`;
+    h+=verfPanel();
     if(t.ohne_mast.length)h+=`<button data-act="omfold">${OM_OPEN?"Liste ausblenden":"Masten ohne Eintrag zeigen"}</button>`;
     if(OM_OPEN)h+=t.ohne_mast.map(o=>`<div class="om">eNB <b>${o.enb}</b> · zuletzt ${tfmt(o.zuletzt)} · ${o.anzahl}×${o.lat!=null?"":" · Ort unbekannt"}
       ${FP_OPEN===o.schluessel?mastForm(o.schluessel,o.lat,o.lng):`<button data-act="open" data-key="${esc(o.schluessel)}">Mast ermitteln</button>`}</div>`).join("")}}
@@ -791,6 +815,8 @@ function renderFP(){
   const ts=el.querySelector("#tracksel"); if(ts)ts.onchange=()=>{TRACK_Q=ts.value;TRACK_H=TRACK_Q?1:0;loadTrack()};
   const ab=el.querySelector("#abdsel"); if(ab)ab.onchange=()=>{ABDECKUNG=ab.checked;loadAbdeckung()};
   const fu=el.querySelector("#funksel"); if(fu)fu.onchange=()=>{L_FUNK=fu.checked;drawFunk();if(L_FUNK)loadAusw()};
+  el.querySelectorAll("input[data-verf]").forEach(x=>x.onchange=()=>{x.checked?VERF_AN.add(x.dataset.verf):VERF_AN.delete(x.dataset.verf);
+    try{localStorage.setItem("mb_verf",JSON.stringify([...VERF_AN]))}catch(e){} drawVerf()});
   const ge=el.querySelector("#gebsel"); if(ge)ge.onchange=()=>{L_GEB=ge.checked;drawGeb();if(L_GEB)loadAusw()};
   el.querySelectorAll(".om button[data-s]").forEach(b=>b.onclick=()=>korrAktion(b.dataset,el.querySelector("#fpmsg")));
 }
