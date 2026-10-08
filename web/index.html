@@ -707,7 +707,7 @@ function guetePanel(){
   const l=G[G.length-1];
   return svg+`<div class="sub">${reihen.map(([k,c,t])=>`<span style="color:${c}">■</span> ${t}`).join(" · ")}</div>`+
     `<table class="gt"><tr><th>Fahrt</th><th>Pkt</th><th>angez.</th><th>Zelle</th><th>Fp</th><th>frei</th></tr>${G.slice(-8).reverse().map(f=>`<tr><td>${tfmt(f.von)}</td><td>${f.n}</td>${reihen.map(([k])=>{const v=(f[k]||{}).median;return `<td${k==="frei"&&f.frei_ocid&&f.frei_ocid.median!=null?` title="OpenCelliD: ${km(f.frei_ocid.median)}"`:""}>${v!=null?km(v):"–"}</td>`}).join("")}</tr>`).join("")}</table>`+freiVerlauf()+
-    `<div class="sub">Median-Fehler gegen Handy-GPS. Eigene Zelldaten und Fingerabdruck jeweils nur aus den <i>anderen</i> Fahrten gelernt. Fingerabdruck ist noch nicht für die Ortung aktiv (90-%-Wert bisher schlechter). „frei“ = nur BeaconDB (OpenCelliD beim Drüberfahren), mit dem heutigen Stand der Datenbank nachgeschlagen; große Werte sind gekappt.</div>`;
+    `<div class="sub">Median-Fehler gegen Handy-GPS. Eigene Zelldaten und Fingerabdruck jeweils nur aus den <i>anderen</i> Fahrten gelernt. Seit 08.10. zeigt die Karte den Ring um den Mast, sonst den Fingerabdruck, sonst die übrigen Verfahren. „frei“ = nur BeaconDB (OpenCelliD beim Drüberfahren), mit dem heutigen Stand der Datenbank nachgeschlagen; große Werte sind gekappt.</div>`;
 }
 function korrPanel(){
   if(!AUSW||AUSW.fehler||!AUSW.masten.length)return "";
